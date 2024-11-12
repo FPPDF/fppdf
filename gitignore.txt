@@ -1,0 +1,50 @@
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# System backup files
+*.*~
+
+# Executables
+*.exe
+*.app
+
+# Input Card Folders
+
+
+# Input Folders
+
+# batchrun folders
+batchruns/*
+out/*
+err/*
+
+# Output Folders
+
+
+# Extras
+

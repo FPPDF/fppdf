@@ -1,0 +1,118 @@
+from global_pars import *
+import numpy as np
+
+
+
+def readincov():
+
+
+    readjac=True
+
+    inputfile='outputs/cov/'+inout_pars.covinput
+
+    disttot=np.loadtxt(inputfile,skiprows=2,max_rows=64)
+
+    pdf_pars.parsin=disttot[0:64,0].flatten()
+    pdf_pars.par_isf=disttot[0:64,1].flatten()
+
+    pdf_pars.npar_free=0
+    afin=np.zeros((1))
+    pdf_pars.par_free_i=np.zeros((1),dtype=np.int8)
+    for i in range(0,len(pdf_pars.parsin)):
+        if pdf_pars.par_isf[i]==1:
+            afin=np.append(afin,pdf_pars.parsin[i])
+            pdf_pars.npar_free+=1
+            pdf_pars.par_free_i=np.append(pdf_pars.par_free_i,i)
+
+    afin=np.delete(afin,0)
+    pdf_pars.par_free_i=np.delete(pdf_pars.par_free_i,0)
+
+
+    # hess=np.loadtxt(inputfile,skiprows=67,max_rows=53)
+    hess=np.loadtxt(inputfile,skiprows=67,max_rows=pdf_pars.npar_free)
+
+#    hessin=np.loadtxt(inputfile,skiprows=68+pdf_pars.npar_free,max_rows=pdf_pars.npar_free)
+
+    # corrmatcalc(hess,afin)
+    
+    if readjac:
+        jac=np.loadtxt(inputfile,skiprows=68+pdf_pars.npar_free,max_rows=pdf_pars.npar_free)
+#        jac=np.loadtxt(inputfile,skiprows=68+2*pdf_pars.npar_free,max_rows=pdf_pars.npar_free)
+        # jac=np.loadtxt(inputfile,skiprows=68+53,max_rows=53)
+    else:
+        jac=0.
+
+def readin():
+
+    inputfile='input/'+inout_pars.inputnam
+
+    with open(inputfile, 'r') as fp:
+        x = fp.readlines()
+        num_lines = len([l for l in x if l.strip(' \n') != ''])
+
+    distuv=np.loadtxt(inputfile,skiprows=1,max_rows=8)
+    distuv=np.vstack([[1.0, 0],distuv]) # so numbers match code (calculated norm)
+    distdv=np.loadtxt(inputfile,skiprows=10,max_rows=8)
+    distdv=np.vstack([[1.0, 0],distdv])
+
+    if basis_pars.dvd_eq_uvd:
+        distdv[1,1]=0.
+
+    distsea=np.loadtxt(inputfile,skiprows=19,max_rows=9)
+    distsp=np.loadtxt(inputfile,skiprows=29,max_rows=9)
+
+    if basis_pars.asp_fix:
+        distsp[0,1]=0.
+
+    distg=np.loadtxt(inputfile,skiprows=39,max_rows=9)
+    distg=np.vstack([[1.0, 0],distg])
+    distsm=np.loadtxt(inputfile,skiprows=49,max_rows=3)
+    distsm1=np.loadtxt(inputfile,skiprows=52,max_rows=6)
+    distsm=np.vstack([distsm,[1.0, 0]])
+    distsm=np.vstack([distsm,distsm1])
+    distdbub=np.loadtxt(inputfile,skiprows=59,max_rows=8)
+
+    if num_lines==67:
+        distcharm=np.zeros((9,2))
+    else:
+        distcharm=np.loadtxt(inputfile,skiprows=68,max_rows=9)
+
+#   Set charm to zero if p. charm theory!
+    if fit_pars.theoryidi==211:
+        distcharm=np.zeros((9,2))
+
+    # disttot=np.vstack([distuv,distdv,distsea,distsp,distg,distsm,distdbub])
+    disttot=np.vstack([distuv,distdv,distsea,distsp,distg,distsm,distdbub,distcharm])
+
+    if fit_pars.fixpar:
+        disttot[:,1]=0.
+    
+    # pdf_pars.parsin=disttot[0:64,0].flatten()    
+    # pdf_pars.par_isf=disttot[0:64,1].flatten()
+
+    pdf_pars.parsin=disttot[0:73,0].flatten()    
+    pdf_pars.par_isf=disttot[0:73,1].flatten()
+
+
+    pdf_pars.npar_free=0
+    afin=np.zeros((1))
+    pdf_pars.par_free_i=np.zeros((1),dtype=np.int8)
+    for i in range(0,len(pdf_pars.parsin)):
+        if pdf_pars.par_isf[i]==1:
+            afin=np.append(afin,pdf_pars.parsin[i])
+            pdf_pars.npar_free+=1
+            pdf_pars.par_free_i=np.append(pdf_pars.par_free_i,i)
+
+    afin=np.delete(afin,0)
+    pdf_pars.par_free_i=np.delete(pdf_pars.par_free_i,0)
+    
+    print('npar_free =', pdf_pars.npar_free)
+
+    outputfile=open('outputs/buffer/'+inout_pars.label+'.dat','w')
+    outputfile.write("Starting new buffer...")
+    outputfile.write("\n")
+
+    return afin
+
+
+
