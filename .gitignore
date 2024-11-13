@@ -1,0 +1,4 @@
+# To ignore
+*.*~
+**/*.*~
+git_push.sh
