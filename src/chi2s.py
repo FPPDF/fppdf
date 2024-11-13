@@ -688,7 +688,7 @@ def chi2corr_global(imin,imax):
 
     for i in range(imin,imax+1):
         dataset_testii=fit_pars.dataset_40[i]  
-        print(fit_pars.dataset_40[i])
+        # print(fit_pars.dataset_40[i])
         inptt = {                                                                                                                 
                 "dataset_input": dataset_testii,                                                                                      
                 "use_cuts": "internal",                                                                                               
