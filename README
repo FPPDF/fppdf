@@ -1,0 +1,21 @@
+Readme (under construction) for fixpar_nnpdf code
+
+Requires NNPDF code from https://docs.nnpdf.science via conda installation. Tested for:
+
+conda install nnpdf python=3.9
+
+(I think python version may be needed for lhapdf to run though need to double check that)
+
+To run simply execute:
+
+python fixpar_nnpdf.py --config=configs/**.yaml
+
+for the corresponding .yaml file. Some explanation of the various flags is provided in the example .yaml files but clearly this needs better documentation + some specific example cases to be provided.
+
+The outputs are in the outputs/ folder:
+
+/evgrids  : the output pdf grids which can then be evolved using the NNPDF evolution (to be tided/documented)
+/buffer : outputs from running code
+/cov : covariance matrix (used for error calculation)
+/evscans: outputs if eigenvector scan is done
+/pars : the PDF parameters

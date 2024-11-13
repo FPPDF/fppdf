@@ -29,7 +29,7 @@ pdf pars:
   # (for PDF pd fits can use parameterisation directly instead, otherwise has to be true)
   uselha: True
   # if lhin=true, name of set input
-  PDFlabel_lhin: MSHT20nnlo_as118_NNPDFev
+  PDFlabel_lhin: MSHT20nnlo_as118
 
 pdf closure:
   # if true then scatters when doing direct PDF pd fit
