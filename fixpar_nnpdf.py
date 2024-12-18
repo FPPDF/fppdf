@@ -144,7 +144,7 @@ if fit_pars.nlo_cuts is None:
 
 fit_pars.newmin=fitp.get("newmin")
 if fit_pars.newmin is None:
-    fit_pars.newmin=False
+    fit_pars.newmin=True
 
 fit_pars.dynT_group=fitp.get("dynT_group")
 if fit_pars.dynT_group is None:
