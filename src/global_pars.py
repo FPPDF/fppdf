@@ -5,6 +5,12 @@ class load_nnpdf:
     l=Loader()
 
 class chi2_pars:
+    # used for newmin calculation
+    ipdf_newmin=0
+    # central pars for newmin
+    cpars_newmin=[]
+    # eps arr for newmin
+    eps_arr_newmin=[]
     # use t0 prescription for covariance matrices when calculating derivatives i.e. dC/dpar
     uset0cov=False 
     # use t0 prescription for covariance matrix in chi^2 calculation
@@ -97,10 +103,13 @@ class min_pars:
     tollm=0.1
 
 class pdf_pars:
+    # 
     # use external LHAPDF grid as input 
     lhin=False
     # labels PDF set for theory evaluation - used internally, value here arbitrary
     PDFlabel='init'
+    # labels central PDF (with no parameter variations in fit for each iteration)
+    PDFlabel_cent='init'
     # absolute path to LHAPDF directory where grids are stored
     lhapdfdir='init'
     # counter to ensure new lhapdf grid used for every new theory evaluation
@@ -125,6 +134,11 @@ class pdf_pars:
     npar_free=0
     # array containing free parameters and their + epsilon values for derivatives - internal
     parinarr=[]
+    # array containing free parameters for new minimisation - internal
+    parinarr_newmin=[]
+    # internal counters for parinarr
+    parin_newmin_counter=0
+    parin_newmin_reset=False
     # integer label of PDF set used for chi2 minimisation - internal
     iPDF=0
     # array of delta_d (internal use)
@@ -217,6 +231,8 @@ class fit_pars:
     pseud=False
     # irep number - also used when generating error grids
     irep=0
+    # lhrep - rep number for lhin=True set
+    lhrep=0
     # NMC PD data - set covariance matrix to be diagonal
     nmcpd_diag=False
     # dataset
@@ -297,9 +313,6 @@ class fit_pars:
     {'dataset': 'LHCBWZMU8TEV', 'cfac': ['NRM', 'QCD']},
     {'dataset': 'LHCB_Z_13TEV_DIMUON', 'cfac': ['QCD']},
     {'dataset': 'LHCB_Z_13TEV_DIELECTRON', 'cfac': ['QCD']}]
-
-    # dataset_40=[{'dataset': 'NMCPD_dw_ite'}]
-
     #  4.0 positivity dataset
     pos_data40=[{'dataset': 'POSXUQ', 'maxlambda': 1e6},
           {'dataset': 'POSXUB', 'maxlambda': 1e6},
@@ -529,6 +542,14 @@ class fit_pars:
     {'dataset': 'LHCB_Z_13TEV_DIMUON', 'cfac': ['QCD']},
     {'dataset': 'LHCB_Z_13TEV_DIELECTRON', 'cfac': ['QCD']}]
 
+    
+
+
+    # dataset_hhcollideronly=[{'dataset': 'D0WMASY', 'cfac': ['QCD']}]
+    # dataset_hhcollideronly=[{'dataset': 'ATLASWZRAP36PB', 'cfac': ['QCD']}]
+
+
+
     dataset_lowenergyDIS=[{'dataset': 'NMCPD_dw_ite'},
     {'dataset': 'NMC'},
     {'dataset': 'SLACP_dwsh'},
@@ -559,6 +580,8 @@ class fit_pars:
     {'dataset': 'DYE886P', 'cfac': ['QCD']},
     {'dataset': 'DYE605_dw_ite', 'cfac': ['QCD']},
     {'dataset': 'DYE906R_dw_ite', 'cfac': ['ACC', 'QCD']}]
+
+    # dataset_lowenergyDISDY=[{'dataset': 'HERACOMBNCEP460'}]
 
     # dataset
     dataset_lowenergyDISDY_HERAonly=[{'dataset': 'NMCPD_dw_ite'},
@@ -750,6 +773,92 @@ class fit_pars:
     {'dataset': 'LHCB_Z0_13TEV_DIMUON-Y'},
     {'dataset': 'LHCB_Z0_13TEV_DIELECTRON-Y'}]
 
+    # dataset_40_new=[{'dataset': 'NMC_NC_NOTFIXED_DW_EM-F2', 'variant': 'legacy'}]
+    
+    dataset_40_new=[{'dataset': 'NMC_NC_NOTFIXED_DW_EM-F2', 'variant': 'legacy'},
+    {'dataset': 'NMC_NC_NOTFIXED_P_EM-SIGMARED', 'variant': 'legacy'},
+    {'dataset': 'SLAC_NC_NOTFIXED_P_DW_EM-F2', 'variant': 'legacy'},
+    {'dataset': 'SLAC_NC_NOTFIXED_D_DW_EM-F2', 'variant': 'legacy'},
+    {'dataset': 'BCDMS_NC_NOTFIXED_P_DW_EM-F2', 'variant': 'legacy'},
+    {'dataset': 'BCDMS_NC_NOTFIXED_D_DW_EM-F2', 'variant': 'legacy'},
+    {'dataset': 'CHORUS_CC_NOTFIXED_PB_DW_NU-SIGMARED', 'variant': 'legacy'},
+    {'dataset': 'CHORUS_CC_NOTFIXED_PB_DW_NB-SIGMARED', 'variant': 'legacy'},
+    {'dataset': 'NUTEV_CC_NOTFIXED_FE_DW_NU-SIGMARED', 'cfac': ['MAS'], 'variant': 'legacy'},
+    {'dataset': 'NUTEV_CC_NOTFIXED_FE_DW_NB-SIGMARED', 'cfac': ['MAS'], 'variant': 'legacy'},
+    {'dataset': 'HERA_NC_318GEV_EM-SIGMARED', 'variant': 'legacy'},
+    {'dataset': 'HERA_NC_225GEV_EP-SIGMARED', 'variant': 'legacy'},
+    {'dataset': 'HERA_NC_251GEV_EP-SIGMARED', 'variant': 'legacy'},
+    {'dataset': 'HERA_NC_300GEV_EP-SIGMARED', 'variant': 'legacy'},
+    {'dataset': 'HERA_NC_318GEV_EP-SIGMARED', 'variant': 'legacy'},
+    {'dataset': 'HERA_CC_318GEV_EM-SIGMARED', 'variant': 'legacy'},
+    {'dataset': 'HERA_CC_318GEV_EP-SIGMARED', 'variant': 'legacy'},
+    {'dataset': 'HERA_NC_318GEV_EAVG_CHARM-SIGMARED', 'variant': 'legacy'},
+    {'dataset': 'HERA_NC_318GEV_EAVG_BOTTOM-SIGMARED', 'variant': 'legacy'},
+    {'dataset': 'DYE866_Z0_800GEV_DW_RATIO_PDXSECRATIO', 'variant': 'legacy'},
+    {'dataset': 'DYE866_Z0_800GEV_PXSEC', 'variant': 'legacy'},
+    {'dataset': 'DYE605_Z0_38P8GEV_DW_PXSEC', 'variant': 'legacy'},
+    {'dataset': 'DYE906_Z0_120GEV_DW_PDXSECRATIO', 'cfac': ['ACC'], 'variant': 'legacy'},
+    {'dataset': 'CDF_Z0_1P96TEV_ZRAP', 'variant': 'legacy'},
+    {'dataset': 'D0_Z0_1P96TEV_ZRAP', 'variant': 'legacy'},
+    {'dataset': 'D0_WPWM_1P96TEV_ASY', 'variant': 'legacy'},
+    {'dataset': 'ATLAS_WPWM_7TEV_36PB_ETA', 'variant': 'legacy'},
+    {'dataset': 'ATLAS_Z0_7TEV_36PB_ETA', 'variant': 'legacy'},
+    {'dataset': 'ATLAS_Z0_7TEV_49FB_HIMASS', 'variant': 'legacy'},
+    {'dataset': 'ATLAS_Z0_7TEV_LOMASS_M', 'variant': 'legacy'},
+    {'dataset': 'ATLAS_WPWM_7TEV_46FB_CC-ETA', 'variant': 'legacy'},
+    {'dataset': 'ATLAS_Z0_7TEV_46FB_CC-Y', 'variant': 'legacy'},
+    {'dataset': 'ATLAS_Z0_7TEV_46FB_CF-Y', 'variant': 'legacy'},
+    {'dataset': 'ATLAS_Z0_8TEV_HIMASS_M-Y', 'variant': 'legacy'},
+    {'dataset': 'ATLAS_Z0_8TEV_LOWMASS_M-Y', 'variant': 'legacy'},
+    {'dataset': 'ATLAS_Z0_13TEV_TOT', 'cfac': ['NRM'], 'variant': 'legacy'},
+    {'dataset': 'ATLAS_WPWM_13TEV_TOT', 'cfac': ['NRM'], 'variant': 'legacy'},
+    {'dataset': 'ATLAS_WJ_8TEV_WP-PT', 'variant': 'legacy'},
+    {'dataset': 'ATLAS_WJ_8TEV_WM-PT', 'variant': 'legacy'},
+    {'dataset': 'ATLAS_Z0J_8TEV_PT-M', 'variant': 'legacy_10'},
+    {'dataset': 'ATLAS_Z0J_8TEV_PT-Y', 'variant': 'legacy_10'},
+    {'dataset': 'ATLAS_TTBAR_7TEV_TOT_X-SEC', 'variant': 'legacy'},
+    {'dataset': 'ATLAS_TTBAR_8TEV_TOT_X-SEC', 'variant': 'legacy'},
+    {'dataset': 'ATLAS_TTBAR_13TEV_TOT_X-SEC', 'variant': 'legacy'},
+    {'dataset': 'ATLAS_TTBAR_8TEV_LJ_DIF_YT-NORM', 'variant': 'legacy'},
+    {'dataset': 'ATLAS_TTBAR_8TEV_LJ_DIF_YTTBAR-NORM', 'variant': 'legacy'},
+    {'dataset': 'ATLAS_TTBAR_8TEV_2L_DIF_YTTBAR-NORM', 'variant': 'legacy'},
+    {'dataset': 'ATLAS_1JET_8TEV_R06_PTY', 'variant': 'legacy_decorrelated'},
+    {'dataset': 'ATLAS_2JET_7TEV_R06_M12Y', 'variant': 'legacy'},
+    {'dataset': 'ATLAS_PH_13TEV_XSEC', 'cfac': ['EWK'], 'variant': 'legacy'},
+    {'dataset': 'ATLAS_SINGLETOP_7TEV_TCHANNEL-XSEC', 'variant': 'legacy'},
+    {'dataset': 'ATLAS_SINGLETOP_13TEV_TCHANNEL-XSEC', 'variant': 'legacy'},
+    {'dataset': 'ATLAS_SINGLETOP_7TEV_T-Y-NORM', 'variant': 'legacy'},
+    {'dataset': 'ATLAS_SINGLETOP_7TEV_TBAR-Y-NORM', 'variant': 'legacy'},
+    {'dataset': 'ATLAS_SINGLETOP_8TEV_T-RAP-NORM', 'variant': 'legacy'},
+    {'dataset': 'ATLAS_SINGLETOP_8TEV_TBAR-RAP-NORM', 'variant': 'legacy'},
+    {'dataset': 'CMS_WPWM_7TEV_ELECTRON_ASY'},
+    {'dataset': 'CMS_WPWM_7TEV_MUON_ASY', 'variant': 'legacy'},
+    {'dataset': 'CMS_Z0_7TEV_DIMUON_2D'},
+    {'dataset': 'CMS_WPWM_8TEV_MUON_Y', 'variant': 'legacy'},
+    {'dataset': 'CMS_Z0J_8TEV_PT-Y', 'cfac': ['NRM'], 'variant': 'legacy_10'},
+    {'dataset': 'CMS_2JET_7TEV_M12Y'},
+    {'dataset': 'CMS_1JET_8TEV_PTY', 'variant': 'legacy'},
+    {'dataset': 'CMS_TTBAR_7TEV_TOT_X-SEC', 'variant': 'legacy'},
+    {'dataset': 'CMS_TTBAR_8TEV_TOT_X-SEC', 'variant': 'legacy'},
+    {'dataset': 'CMS_TTBAR_13TEV_TOT_X-SEC', 'variant': 'legacy'},
+    {'dataset': 'CMS_TTBAR_8TEV_LJ_DIF_YTTBAR-NORM', 'variant': 'legacy'},
+    {'dataset': 'CMS_TTBAR_5TEV_TOT_X-SEC', 'variant': 'legacy'},
+    {'dataset': 'CMS_TTBAR_8TEV_2L_DIF_MTTBAR-YT-NORM', 'variant': 'legacy'},
+    {'dataset': 'CMS_TTBAR_13TEV_2L_DIF_YT', 'variant': 'legacy'},
+    {'dataset': 'CMS_TTBAR_13TEV_LJ_2016_DIF_YTTBAR', 'variant': 'legacy'},
+    {'dataset': 'CMS_SINGLETOP_7TEV_TCHANNEL-XSEC', 'variant': 'legacy'},
+    {'dataset': 'CMS_SINGLETOP_8TEV_TCHANNEL-XSEC', 'variant': 'legacy'},
+    {'dataset': 'CMS_SINGLETOP_13TEV_TCHANNEL-XSEC', 'variant': 'legacy'},
+    {'dataset': 'LHCB_Z0_7TEV_DIELECTRON_Y'},
+    {'dataset': 'LHCB_Z0_8TEV_DIELECTRON_Y'},
+    {'dataset': 'LHCB_WPWM_7TEV_MUON_Y', 'cfac': ['NRM']},
+    {'dataset': 'LHCB_Z0_7TEV_MUON_Y', 'cfac': ['NRM']},
+    {'dataset': 'LHCB_WPWM_8TEV_MUON_Y', 'cfac': ['NRM']},
+    {'dataset': 'LHCB_Z0_8TEV_MUON_Y', 'cfac': ['NRM']},
+    {'dataset': 'LHCB_Z0_13TEV_DIMUON-Y'},
+    {'dataset': 'LHCB_Z0_13TEV_DIELECTRON-Y'}]
+
+
  
     
     # dataset_40_new=[{'dataset': 'DYE906_Z0_120GEV_DW_PDXSECRATIO', 'cfac': ['ACC'], 'variant': 'legacy'}]
@@ -761,3 +870,4 @@ class fit_pars:
     preds_stored={}
     datapath=''
     theories_path=''
+    newmin=False

@@ -3,6 +3,51 @@ from chebyshevs import *
 import numpy as np
 import os
 from scipy.integrate import quadrature
+from scipy.misc import derivative as deriv
+
+def func_pdfs_diff(eps,ipdf,x,iorder):
+
+    # print(eps)
+
+    if eps == 0.:
+        out=pdfs_msht(ipdf,pdf_pars.parinarr[0,:],x)
+        if pdf_pars.parin_newmin_reset:
+            pdf_pars.parinarr_newmin[pdf_pars.parin_newmin_counter,:]=pdf_pars.parinarr[0,:]
+    else:
+        if pdf_pars.parin_newmin_reset:
+            (pars,eps_out)=parinc_newmin(pdf_pars.parinarr[0,:],chi2_pars.ipdf_newmin-1,eps)
+            pdf_pars.parinarr_newmin[pdf_pars.parin_newmin_counter,:]=pars
+        else:
+            pars=pdf_pars.parinarr_newmin[pdf_pars.parin_newmin_counter,:]
+        out=pdfs_msht(ipdf,pars,x)
+
+    pdf_pars.parin_newmin_counter+=1
+
+    return out
+
+def pdfs_diff(ipdf,x):
+
+    eps=1e-5
+    # (pars,eps_out)=parinc_newmin(pdf_pars.parinarr[0,:],chi2_pars.ipdf_newmin-1,eps)
+    eps=parinc_eps(pdf_pars.parinarr[0,:],chi2_pars.ipdf_newmin-1,eps)
+
+    # # pdfout=pdfs_msht(ipdf,pars,x)-pdfs_msht(ipdf,pdf_pars.parinarr[0,:],x)
+    # pdfout=func_pdfs_diff(eps,ipdf,x)-func_pdfs_diff(0.,ipdf,x)
+    # # pdfout/=chi2_pars.eps_arr_newmin[chi2_pars.ipdf_newmin]
+    # pdfout/=eps
+
+    # derivative(func, x0, dx=1.0
+
+    pdf_pars.parin_newmin_counter=0
+    iorder=5
+    pdfout=deriv(func_pdfs_diff,0.,eps,args=(ipdf,x,iorder),order=iorder)
+    pdf_pars.parin_newmin_reset=False
+
+
+    # print(pdfout,test)
+    # os.quit()
+
+    return pdfout
 
 def pdfs_msht(ipdf,pars,x):
 
@@ -619,6 +664,8 @@ def msum_ag(pars):
 
     outng=qv_int(auv,2,xmin)+qv_int(adv,2,xmin)+qv_int(asea,2,xmin)+qv_int(fitcharm,2,xmin)
 
+    
+
     # outng=0.66336
     # outng=0.67364
 
@@ -754,6 +801,7 @@ def sumrules(parin):
     out[basis_pars.i_sm_min+3]=x0
 
     out[0]=qv_norm(1,auv)
+    # print('out0 =',out[0])
     # out[9]=qv_norm(2,adv)
     out[basis_pars.i_dv_min]=qv_norm(2,adv)
     
@@ -1013,13 +1061,72 @@ def parcheck(pars):
         
 #    print('test',delg,delgp)
 
-def parinc(parin,ipar,epar):
-
+def parinc_eps(parin,ipar,eps):
 
     npar=pdf_pars.par_free_i[ipar]
 
+    eps_n=eps*np.abs(parin[npar])
 
+    if np.abs(parin[npar]) < 1e-8:
+        eps_n=1e-12
+
+    return eps_n
+
+def parinc_newmin(parin,ipar,eps):
+
+    npar=pdf_pars.par_free_i[ipar]
+
+    # eps_n=eps*np.abs(parin[npar])
+    eps_n=eps
+
+    # if np.abs(parin[npar]) < 1e-8:
+    #     eps_n=1e-12
+
+    out=parin.copy()
+    out[npar]=out[npar]+eps_n
+
+    ###  sum rules...
+
+    if basis_pars.asp_fix:
+        out[basis_pars.i_sp_min+1]=out[basis_pars.i_sea_min+1]
+    if basis_pars.dvd_eq_uvd:
+        out[basis_pars.i_dv_min+1]=out[basis_pars.i_uv_min+1]
+
+
+    out[basis_pars.i_sm_min+3]=1.
+    out[0]=1.
+    out[basis_pars.i_dv_min]=1.
+    out[basis_pars.i_g_min]=1.
+
+    if basis_pars.t8_int:
+        asea=out[basis_pars.i_sea_min:basis_pars.i_sea_max].copy()
+        asp=out[basis_pars.i_sp_min:basis_pars.i_sp_max].copy()
+        norm_sea=q_msht_lowx_norm(asea)  
+        asp_new=sp_norm_fix(norm_sea,asp)
+        out[basis_pars.i_sp_min]=asp_new
+
+    asm=out[basis_pars.i_sm_min:basis_pars.i_sm_max].copy()
+    auv=out[basis_pars.i_uv_min:basis_pars.i_uv_max].copy()
+
+    adv=out[basis_pars.i_dv_min:basis_pars.i_dv_max].copy()
+    x0=smin_norm(asm)
     
+    out[basis_pars.i_sm_min+3]=x0
+
+    out[0]=qv_norm(1,auv)
+
+    out[basis_pars.i_dv_min]=qv_norm(2,adv)
+
+    ag=msum_ag(out)
+
+    out[basis_pars.i_g_min]=ag
+
+    return (out,eps_n)
+
+def parinc(parin,ipar,epar):
+
+    npar=pdf_pars.par_free_i[ipar]
+
     eps=1e-5 # was 1e-5 before
     eps_n=eps*np.abs(parin[npar])
 
@@ -1038,19 +1145,13 @@ def parinc(parin,ipar,epar):
 
     ###  sum rules...
 
-
-
     if basis_pars.asp_fix:
         # out[28]=out[19]
         out[basis_pars.i_sp_min+1]=out[basis_pars.i_sea_min+1]
     if basis_pars.dvd_eq_uvd:
         # out[10]=out[1]
         out[basis_pars.i_dv_min+1]=out[basis_pars.i_uv_min+1]
-        
-    # out[49]=1.
-    # out[0]=1.
-    # out[9]=1.
-    # out[36]=1.
+
 
     out[basis_pars.i_sm_min+3]=1.
     out[0]=1.
@@ -1080,6 +1181,9 @@ def parinc(parin,ipar,epar):
     out[basis_pars.i_sm_min+3]=x0
 
     out[0]=qv_norm(1,auv)
+    # print('out =',out[0])
+    # LHL NEW TO DELETE
+    # out[0]=2.344063147372577
     # out[9]=qv_norm(2,adv)
     out[basis_pars.i_dv_min]=qv_norm(2,adv)
 
@@ -1087,7 +1191,5 @@ def parinc(parin,ipar,epar):
 
     # out[36]=ag
     out[basis_pars.i_g_min]=ag
-
-
 
     return (out,eps_n)

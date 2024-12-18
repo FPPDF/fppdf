@@ -112,6 +112,8 @@ inout_pars.pd_output=pdflag.get("pd_output")
 if inout_pars.pd_output is None:
     inout_pars.pd_output=False
 
+
+
 fitp = config.get("fit pars")
 fit_pars.fixpar=fitp.get("fixpar")
 fit_pars.theoryidi=fitp.get("theoryidi")
@@ -128,9 +130,6 @@ if fit_pars.pos_dyc is None:
     fit_pars.pos_dyc=False
 fit_pars.pseud=fitp.get("pseud")
 fit_pars.irep=fitp.get("irep")
-fit_pars.lhrep=fitp.get("lhrep")
-if fit_pars.lhrep is None:
-    fit_pars.lhrep=0
 fit_pars.nmcpd_diag=fitp.get("nmcpd_diag")
 chi2_pars.t0_noderivin=fitp.get("t0_noderivin")
 fit_pars.deld_const=fitp.get("deld_const")
@@ -141,10 +140,6 @@ if tollm is not None:
 fit_pars.nlo_cuts=fitp.get("nlo_cuts")
 if fit_pars.nlo_cuts is None:
     fit_pars.nlo_cuts=False
-
-fit_pars.newmin=fitp.get("newmin")
-if fit_pars.newmin is None:
-    fit_pars.newmin=True
 
 fit_pars.dynT_group=fitp.get("dynT_group")
 if fit_pars.dynT_group is None:
@@ -248,12 +243,20 @@ if fit_pars.theoryidi==212:
     fit_pars.dataset_40=fit_pars.dataset_40_nlo
     fit_pars.imaxdat=len(fit_pars.dataset_40) 
 
+# fit_pars.imaxdat=10
+# fit_pars.imindat=9
+
 pdf_pars.lhapdfdir=get_lha_datapath()+'/'
 profile=_get_nnpdf_profile(None)
-fit_pars.datapath=pathlib.Path(profile["data_path"])
+
+print(pdf_pars.lhapdfdir)
+
+
+# fit_pars.datapath=pathlib.Path(profile["data_path"])
 # fit_pars.theories_path=pathlib.Path(profile["theories_path"])
 
-fit_pars.newmin=True
+# print(fit_pars.theories_path)
+# os.quit()
 
 if chi2_pars.diff_4:
     chi2_pars.diff_2=True 
@@ -268,6 +271,7 @@ if pdf_pars.lhin:
     fit_pars.fixpar=True
 
 fit_pars.alphas=0.118
+
 
 tzero=time.process_time()
 
@@ -296,7 +300,6 @@ outputfile.write("inputnam = ")
 outputfile.write(inout_pars.inputnam)
 outputfile.write("\n")
 
-# msht_kfs()
 
 print(tzero)
 
@@ -486,12 +489,6 @@ elif(use_levmar):
                 chi2_pars.t0=False
                 chi2_pars.t0_noderiv=False
 
-             
-            chi2_pars.t0=False
-            chi2_pars.t0_noderiv=False
-            # chi2_pars.diff_2=True
-
-
             outputfile=open('outputs/buffer/'+inout_pars.label+'.dat','a')
             outputfile.write("diff2=False")
             print("diff2=False")
@@ -508,15 +505,14 @@ elif(use_levmar):
 
             # chi2_pars.t0_noderiv=False
             # chi2_pars.t0=True
-            
-            if not fit_pars.newmin:
-                chi2_pars.diff_2=True
-                outputfile=open('outputs/buffer/'+inout_pars.label+'.dat','a')
-                print('t0=True,diff2=True')
-                outputfile.write("t0=True,diff2=True")
-                outputfile.write(inout_pars.inputnam)
-                outputfile.write("\n")
-                afo=levmar(afo)
+                
+            chi2_pars.diff_2=True
+            outputfile=open('outputs/buffer/'+inout_pars.label+'.dat','a')
+            print('t0=True,diff2=True')
+            outputfile.write("t0=True,diff2=True")
+            outputfile.write(inout_pars.inputnam)
+            outputfile.write("\n")
+            afo=levmar(afo)
             
 
             # chi2_pars.diff_2=True
