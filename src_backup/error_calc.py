@@ -20,6 +20,7 @@ def hesserror_dynamic_tol(afi,hess,jaci):
     delchi50=False
     chi50=False
 
+
     output='outputs/evscans/'+inout_pars.label+'.dat'
 
     if(inhess):
@@ -159,11 +160,6 @@ def hesserror_dynamic_tol(afi,hess,jaci):
 def hesserror_dynamic_tol_new(afi,hess,jaci):
 
     output='outputs/evscans/'+inout_pars.label+'.dat'
-
-    msht_fix=False
-
-    if msht_fix:
-        (hess,afi)=hessfix(hess)
 
     chi2_pars.chi2ind=True
     chi2_pars.chitotind=False

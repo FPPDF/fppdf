@@ -207,12 +207,12 @@ def Phi_msht_int():
     xmax=0.5
 
 
-    if fit_pars.theoryidi==211 or fit_pars.theoryidi==40001000 or fit_pars.theoryidi==50001000:
+    if fit_pars.theoryidi==211 or fit_pars.theoryidi==40001000:
         pdfmax=8    
     else: 
         pdfmax=9
 
-    if fit_pars.theoryidi==211 or fit_pars.theoryidi==40001000 or fit_pars.theoryidi==50001000:
+    if fit_pars.theoryidi==211 or fit_pars.theoryidi==40001000:
         pdfmax=3    
     else: 
         pdfmax=4

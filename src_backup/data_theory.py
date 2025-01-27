@@ -18,11 +18,11 @@ from validphys.commondataparser import load_commondata
 from validphys.convolution import OP
 import functools
 from validphys.pdfbases import evolution
-import contextlib
 
 def dat_calc_rep(dscomb,cov):
 
     if fit_pars.nlo_cuts:
+        # intersection=[{"dataset_inputs": dload_pars.dscomb, "theoryid": 212}]
         intersection=[{"dataset_inputs": dload_pars.dscomb, "theoryid": 200}]
         lcd = API.dataset_inputs_loaded_cd_with_cuts(dataset_inputs=dscomb,theoryid=fit_pars.theoryidi,use_cuts="fromintersection",cuts_intersection_spec=intersection)                          
     else:
@@ -30,6 +30,14 @@ def dat_calc_rep(dscomb,cov):
     
     if fit_pars.pseud:
         dattot=make_replica(lcd,replica_mcseed=fit_pars.irep,dataset_inputs_sampling_covmat=cov,sep_mult=False,genrep=True)  
+
+        # level1=API.make_level1_data(dataset_inputs=dscomb,theoryid=fit_pars.theoryidi,use_cuts='internal',fakepdf=pdf_pars.PDFlabel,filterseed=1)
+        # level1_data=load_commondata(level1)
+
+        # print(level1)
+        # print(level1_data)
+        # exit()
+
     else:
         dattot=make_replica(lcd,replica_mcseed=fit_pars.irep,dataset_inputs_sampling_covmat=cov,sep_mult=False,genrep=False)
         
@@ -81,7 +89,7 @@ def pos_calc(pdata):
     
     for j in range(0,len(pdata)):
     
-        if fit_pars.theoryidi==40001000 or fit_pars.theoryidi==50001000:            
+        if fit_pars.theoryidi==40001000:            
             api_predictions = API.positivity_predictions_data_result(theoryid=fit_pars.theoryidi, pdf=pdf_pars.PDFlabel, posdataset=pdata[j],use_cuts="internal")
         else:
             api_predictions = API.positivity_predictions_data_result(theoryid=fit_pars.theoryidi, pdf=pdf_pars.PDFlabel, posdataset=pdata[j])
@@ -129,25 +137,12 @@ def _asy(a, b):
 def _com(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t):
     return (a + b + c + d + e + f + g + h + i + j) / (k + l + m + n + o + p + q + r + s + t)
 
-
-def output_fktables_names(fknam):
-
-    output='fknames.dat'
-    
-    with open(output,'a') as outputfile:
-    
-        outputfile.write(str(fknam))                                                   
-        outputfile.write('\n')
-        
-
 def _predictions_2pdfs(dataset, fkfunc, pdf1, pdf2=None):
     """Combine data on all the FKTables in the database according to the
     reduction operation defined therein. Dispatch the kind of predictions (for
     all replicas, central, etc) according to the provided ``fkfunc``, which
     should have the same interface as e.g. ``fk_predictions``.
     """
- 
-    # print(dataset)
     # print(dataset.op)
     opfunc = OP[dataset.op]
     if dataset.cuts is None:
@@ -159,32 +154,12 @@ def _predictions_2pdfs(dataset, fkfunc, pdf1, pdf2=None):
         )
     cuts = dataset.cuts.load()
     all_predictions = []
-    ifk=0
-    # print(dataset.fkspecs)
-    # os.quit()
-    # for fkarr in dataset.fkspecs[0].metadata.FK_tables:
-    #     for fk in fkarr:
-    #         output_fktables_names(fk)
-
     for fk in dataset.fkspecs:
-        # print('ifk=',ifk)
-        # print(fk)
-        # print('')
-        # print(fk.metadata.FK_tables)
-        # print('')
-        # print(len(fk.metadata.FK_tables(0))
-        # os.quit()
-        if fit_pars.load_fk:
-            fk_w_cuts = load_fktable(fk).with_cuts(cuts)
-        else:
-            fk_w_cuts = Dummy()
-            fk_w_cuts.hadronic=True
+        fk_w_cuts = load_fktable(fk).with_cuts(cuts)
         if pdf2 is not None:
-            all_predictions.append(fkfunc(dataset,fk_w_cuts, pdf1, pdf2, ifk))
+            all_predictions.append(fkfunc(fk_w_cuts, pdf1, pdf2))
         else:
-            all_predictions.append(fkfunc(dataset,fk_w_cuts, pdf1, None, ifk))
-        ifk+=1
-
+            all_predictions.append(fkfunc(fk_w_cuts, pdf1))
     # Old fktables repeated values to make DEN and NUM sizes match in RATIO operations
     # pineappl tables instead just contain the one value used
     # The code below works for both situation while keeping `true_div` as the operation
@@ -219,51 +194,49 @@ def _predictions_2pdfs_new(dataset, fkfunc, pdf1, pdf2=None):
     ifk=0
     fk_w_cuts_arr=[]
     for fk in dataset.fkspecs:
-        if fit_pars.load_fk:
-            fk_w_cuts = load_fktable(fk).with_cuts(cuts)
-            # print(fk_w_cuts)
-        else:
-            fk_w_cuts = Dummy()
-            fk_w_cuts.hadronic=True
-        # fk_w_cuts = load_fktable(fk).with_cuts(cuts)
+        fk_w_cuts = load_fktable(fk).with_cuts(cuts)
         # Edited so dO/dpar calculated 
         if fit_pars.newmin and fk_w_cuts.hadronic:
             if dataset.op == 'NULL':
-                fkapp=fkfunc(dataset,fk_w_cuts, pdf1, pdf2)+fkfunc(dataset,fk_w_cuts, pdf2, pdf1)
+                fkapp=fkfunc(fk_w_cuts, pdf1, pdf2)+fkfunc(fk_w_cuts, pdf2, pdf1)
                 all_predictions.append(fkapp)
             elif dataset.op == 'RATIO' or dataset.op == 'ASY' or dataset.op == 'COM':
                 fk_w_cuts_arr.append(fk_w_cuts)
             else:
-                all_predictions.append(fkfunc(dataset,fk_w_cuts, pdf1, pdf2))
+                all_predictions.append(fkfunc(fk_w_cuts, pdf1, pdf2))
         else:
             if dataset.op == 'RATIO':
                 fk_w_cuts_arr.append(fk_w_cuts)
             else:   
-                all_predictions.append(fkfunc(dataset,fk_w_cuts, pdf2))
+                all_predictions.append(fkfunc(fk_w_cuts, pdf2))
         ifk+=1
 
-
     if dataset.op == 'RATIO' and pdf2 is None:
-        fk_num_diff=fkfunc(dataset,fk_w_cuts_arr[0],pdf2)       
+        fk_num_diff=fkfunc(fk_w_cuts_arr[0],pdf2)
         all_predictions_r1.append(fk_num_diff)
-        fk_den=fkfunc(dataset,fk_w_cuts_arr[1],pdf1)
+        fk_den=fkfunc(fk_w_cuts_arr[1],pdf1)
         all_predictions_r1.append(fk_den)
 
-        fk_den_diff=fkfunc(dataset,fk_w_cuts_arr[1],pdf2)
-        fk_num=fkfunc(dataset,fk_w_cuts_arr[0],pdf1)
+        fk_den_diff=fkfunc(fk_w_cuts_arr[1],pdf2)
+        fk_num=fkfunc(fk_w_cuts_arr[0],pdf1)
         all_predictions_r2.append(fk_den_diff*fk_num)
         fkapp=np.power(fk_den,2)
         all_predictions_r2.append(fkapp)
 
     if dataset.op == 'RATIO' and pdf2 is not None:
-        fk_num_12=fkfunc(dataset,fk_w_cuts_arr[0], pdf1, pdf2,0)+fkfunc(dataset,fk_w_cuts_arr[0], pdf2, pdf1,0)
+        fk_num_12=fkfunc(fk_w_cuts_arr[0], pdf1, pdf2)+fkfunc(fk_w_cuts_arr[0], pdf2, pdf1)
         fkapp=fk_num_12
         all_predictions_r1.append(fkapp)
-        fk_den_1=fkfunc(dataset,fk_w_cuts_arr[1], pdf1,None,1)
+        fk_den_1=fkfunc(fk_w_cuts_arr[1], pdf1)
         fkapp=fk_den_1
         all_predictions_r1.append(fkapp)
 
-        # print(all_predictions_r1)
+        # fk_num_1=fkfunc(fk_w_cuts_arr[0], pdf1)
+        # fk_den_12=fkfunc(fk_w_cuts_arr[1], pdf1, pdf2)+fkfunc(fk_w_cuts_arr[1], pdf2, pdf1)
+        # fkapp=fk_num_1*fk_den_12
+        # all_predictions_r2.append(fkapp)
+        # fkapp=np.power(fk_den_1,2)
+        # all_predictions_r2.append(fkapp)
 
         fk_num_1=fkfunc(dataset,fk_w_cuts_arr[0], pdf1,None,0)
         fk_den_12=fkfunc(dataset,fk_w_cuts_arr[1], pdf1, pdf2,1)+fkfunc(dataset,fk_w_cuts_arr[1], pdf2, pdf1,1)
@@ -277,14 +250,12 @@ def _predictions_2pdfs_new(dataset, fkfunc, pdf1, pdf2=None):
         # print(fkapp)
         all_predictions_r2.append(fkapp)
 
-      
-
     if dataset.op == 'ASY' and pdf2 is not None:
-        fk_12_a=fkfunc(dataset,fk_w_cuts_arr[0], pdf1, pdf2,0)+fkfunc(dataset,fk_w_cuts_arr[0], pdf2, pdf1,0)
-        fk_12_b=fkfunc(dataset,fk_w_cuts_arr[1], pdf1, pdf2,1)+fkfunc(dataset,fk_w_cuts_arr[1], pdf2, pdf1,1)
+        fk_12_a=fkfunc(fk_w_cuts_arr[0], pdf1, pdf2)+fkfunc(fk_w_cuts_arr[0], pdf2, pdf1)
+        fk_12_b=fkfunc(fk_w_cuts_arr[1], pdf1, pdf2)+fkfunc(fk_w_cuts_arr[1], pdf2, pdf1)
         all_predictions_r1.append(fk_12_a-fk_12_b)
-        fk_1_a=fkfunc(dataset,fk_w_cuts_arr[0], pdf1,pdf1,0)
-        fk_1_b=fkfunc(dataset,fk_w_cuts_arr[1], pdf1,pdf1,1)
+        fk_1_a=fkfunc(fk_w_cuts_arr[0], pdf1)
+        fk_1_b=fkfunc(fk_w_cuts_arr[1], pdf1)
         all_predictions_r1.append(fk_1_a+fk_1_b)
 
         fkapp=fk_12_a+fk_12_b
@@ -296,19 +267,19 @@ def _predictions_2pdfs_new(dataset, fkfunc, pdf1, pdf2=None):
     if dataset.op == 'COM' and pdf2 is not None:
         fk_num_12=0.
         for i in range(0,10):
-            fk_num_12+=fkfunc(dataset,fk_w_cuts_arr[i], pdf1, pdf2)+fkfunc(dataset,fk_w_cuts_arr[i], pdf2, pdf1)
+            fk_num_12+=fkfunc(fk_w_cuts_arr[i], pdf1, pdf2)+fkfunc(fk_w_cuts_arr[i], pdf2, pdf1)
         all_predictions_r1.append(fk_num_12)
         fk_den_1=0.
         for i in range(10,20):
-            fk_den_1+=fkfunc(dataset,fk_w_cuts_arr[i], pdf1)
+            fk_den_1+=fkfunc(fk_w_cuts_arr[i], pdf1)
         all_predictions_r1.append(fk_den_1)
 
         fk_num_1=0.
         for i in range(0,10):
-            fk_num_1+=fkfunc(dataset,fk_w_cuts_arr[i], pdf1)
+            fk_num_1+=fkfunc(fk_w_cuts_arr[i], pdf1)
         fk_den_12=0.
         for i in range(10,20):
-            fk_den_12+=fkfunc(dataset,fk_w_cuts_arr[i], pdf1, pdf2)+fkfunc(dataset,fk_w_cuts_arr[i], pdf2, pdf1)
+            fk_den_12+=fkfunc(fk_w_cuts_arr[i], pdf1, pdf2)+fkfunc(fk_w_cuts_arr[i], pdf2, pdf1)
         fkapp=fk_num_1*fk_den_12
         all_predictions_r2.append(fkapp)
         fkapp=np.power(fk_den_1,2)
@@ -334,34 +305,6 @@ def _predictions_2pdfs_new(dataset, fkfunc, pdf1, pdf2=None):
     else:
         out=opfunc(*all_predictions)
 
-
-    return out
-
-def df_2_array(predsin):
-    
-    preds=predsin.copy().T
-    assert isinstance(preds, pd.DataFrame)
-    test=preds.iloc[0]
-    assert isinstance(test, pd.Series)
-    predarr=test.array
-
-    # out=pd.DataFrame(predarr)
-    
-    return predarr
-
-
-def central_hadron_predictions_2pdfs_wmsht(ds,loaded_fk, pdf1, pdf2=None,fk_it=None):
-
-    # print(fk_it)
-    if fit_pars.load_fk:
-        out=central_hadron_predictions_2pdfs(loaded_fk, pdf1, pdf2)
-        outarr=df_2_array(out)
-
-    dataset_testii=fit_pars.dataset_ii_global
-
-
-    out=pd.DataFrame(outarr)
-
     return out
 
 def central_hadron_predictions_2pdfs(loaded_fk, pdf1, pdf2=None):
@@ -372,35 +315,22 @@ def central_hadron_predictions_2pdfs(loaded_fk, pdf1, pdf2=None):
         gv2 = functools.partial(evolution.central_grid_values, pdf=pdf2)
     else:
         gv2=gv1
+    return _gv_hadron_predictions(loaded_fk, gv1, gv2)
 
-    out=_gv_hadron_predictions(loaded_fk, gv1, gv2)
-    return out
-
-def central_fk_predictions_2pdfs(ds,loaded_fk, pdf1, pdf2=None, ifk=None):
+def central_fk_predictions_2pdfs(loaded_fk, pdf1, pdf2=None):
     """Same as :py:func:`fk_predictions`, but computing predictions for the
     central PDF member only."""
     if loaded_fk.hadronic:
         if pdf2 is not None:
-            # out=central_hadron_predictions_2pdfs(loaded_fk, pdf1, pdf2)
-            out=central_hadron_predictions_2pdfs_wmsht(ds,loaded_fk, pdf1, pdf2, ifk)
-            return out
-            # return central_hadron_predictions_2pdfs(loaded_fk, pdf1, pdf2)
+            return central_hadron_predictions_2pdfs(loaded_fk, pdf1, pdf2)
         else:
-            # out=central_hadron_predictions_2pdfs(loaded_fk, pdf1)
-            out=central_hadron_predictions_2pdfs_wmsht(ds,loaded_fk, pdf1, None, ifk)
-            return out
-            # return central_hadron_predictions_2pdfs(loaded_fk, pdf1)
+            return central_hadron_predictions_2pdfs(loaded_fk, pdf1)
     else:
         return central_dis_predictions(loaded_fk, pdf1)
 
 def theory_calc(i,dataset_testii,inpt,ctrue):
-
-    dnam=str(API.dataset(**inpt))
-
-    fit_pars.load_fk=True
-
+   
     predarr=theory_calc_def(i,dataset_testii,inpt,ctrue)
-
 
     return(predarr)
 
@@ -417,8 +347,8 @@ def preds_calc(ds,pdfin0,pdfin=None):
         # else:
         #     preds=central_predictions(ds,pdfin).T
     else:
-        preds = _predictions_2pdfs(ds,central_fk_predictions_2pdfs,pdfin0).T
-        # preds=central_predictions(ds,pdfin0).T
+        # preds = _predictions_2pdfs(ds,central_fk_predictions_2pdfs,pdfin0).T
+        preds=central_predictions(ds,pdfin0).T
     # preds=central_predictions(ds,pdfin).T
     assert isinstance(preds, pd.DataFrame)
     test=preds.iloc[0]
@@ -445,7 +375,6 @@ def theory_calc_def(i,dataset_testii,inpt,ctrue):
     # print(i)
     # print(dload_pars.fk_loadarr[i])
 
-    fit_pars.dataset_ii_global=dataset_testii
 
     if ctrue:
         cfaci=API.cfac(**dataset_testii)
@@ -489,8 +418,6 @@ def theory_calc_def(i,dataset_testii,inpt,ctrue):
         # ds_nlo=load_nnpdf.l.check_dataset(dnam, theoryid=212)
         ds_nlo=load_nnpdf.l.check_dataset(dnam, theoryid=200)
         ds.cuts=ds_nlo.cuts
-
- 
 
     # cuts = ds.cuts.load()
     # table=load_fktable(ds.fkspecs[0]).with_cuts(cuts)
@@ -603,9 +530,7 @@ def theory_calc_def(i,dataset_testii,inpt,ctrue):
         # predarr1=preds_calc(ds,pdfin0,pdfin)
         # predarr2=preds_calc(ds,pdfin,pdfin0)
         # predarr=predarr1+predarr2
-
         predarr=preds_calc(ds,pdfin0,pdfin)
-
     else:
         predarr=preds_calc(ds,pdfin)
         # predarr=preds_calc(ds,pdfin,pdf_nn)

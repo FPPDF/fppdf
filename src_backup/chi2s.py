@@ -95,6 +95,12 @@ def chi2min_fun(afree,jac_calc,hess_calc):
 
     pdf_pars.pdfparsi=sumrules(pdfparsii)
 
+#   PHI TEST
+
+    # test_int=Phi_msht_int()
+    # print(test_int)
+    # exit()
+
 
     if fit_pars.deld_const:
         pdf_pars.deld_arr=np.zeros((4*pdf_pars.npar_free+1))
@@ -302,7 +308,7 @@ def chi2corr_pdf():
     lxmax=np.log(xmax)
     delerr=0.01
 
-    if fit_pars.theoryidi==211 or fit_pars.theoryidi==40001000 or fit_pars.theoryidi==50001000:
+    if fit_pars.theoryidi==211 or fit_pars.theoryidi==40001000:
         qin=1.
     elif fit_pars.theoryidi==200:
         qin=1.65
@@ -638,6 +644,7 @@ def chi2corr_ind(i):
         cov_gl=dload_pars.covexp
         covin_gl=dload_pars.covexp_inv
         
+
     cov_ind=cov_gl[chi2_pars.idat_low_arr[i]:chi2_pars.idat_up_arr[i],chi2_pars.idat_low_arr[i]:chi2_pars.idat_up_arr[i]]
     cov=cov_ind
     cov_inv=la.inv(cov)
@@ -645,23 +652,19 @@ def chi2corr_ind(i):
 
 
     theory=dload_pars.tharr_gl[chi2_pars.idat_low_arr[i]:chi2_pars.idat_up_arr[i]]
-
-    # print(theory)
-
     # dattot=dat_calc_rep(dscomb,cov)
     dattot=dload_pars.darr_gl[chi2_pars.idat_low_arr[i]:chi2_pars.idat_up_arr[i]]
 
 
-    ndat=len(dattot)
+    chi2_pars.ndat=len(dattot)
 
     diffs=np.array(dattot-theory)
     # out=calc_chi2(la.cholesky(cov, lower=True), diffs)
     out=diffs@cov_inv@diffs
 
-    return (out,ndat,dlabel)
+    return (out,chi2_pars.ndat,dlabel)
 
 def chi2corr_global(imin,imax):
-
 
     if fit_pars.nlo_cuts:
         # intersection=[{"dataset_inputs": dload_pars.dscomb, "theoryid": 212}]
@@ -759,6 +762,7 @@ def chi2corr_global(imin,imax):
         #         "use_cuts": "internal",                                                                                               
         #         "theoryid": fit_pars.theoryidi,                                                                         
         #     }    
+
                
         theory=theory_calc(i,dataset_testii,inptt,fit_pars.cftrue[i])
         fit_pars.preds_stored[str(dataset_testii["dataset"])]=theory
@@ -787,11 +791,6 @@ def chi2corr_global(imin,imax):
             theorytoti=np.concatenate((theorytot,theory))
             theorytot=theorytoti
      
-
-    # print(chi2_pars.idat_low_arr)
-    # print(len())
-
-
 
     # os.quit()
     # dattot=dat_calc_rep(dload_pars.dscomb,cov)
@@ -843,9 +842,7 @@ def chi2corr_global(imin,imax):
             # print(dload_pars.dscomb[0]["dataset"])
 
             # cov = API.dataset_inputs_t0_covmat_from_systematics(**inpt0)
-            print(pdf_pars.PDFlabel)
             cov = calc_covmat_t0(inpt0)
-            
             covin=la.inv(cov)
 
             # print(covtest-cov)
@@ -1025,17 +1022,6 @@ def chi2corr_global(imin,imax):
     dattotr=2.*dattot-1.
     theorytotr=2.*theorytot-1.
 
-    # chitot=0.
-    # for i in range(fit_pars.imindat,fit_pars.imaxdat): 
-
-    #     (chi,nd,dlab)=chi2corr_ind(i)
-    #     print(i,dlab,chi)
-    #     # print(i,'  ',chi)
-    #     # print(nd)
-    #     chitot+=chi
-
-    # print(chitot)
-
     # outputfile=open('outputs/pseudodata/40data.dat','w')
     # for i in range (0,len(theorytot)):
     #     outputfile.write(str(dattot[i]))
@@ -1096,8 +1082,7 @@ def chi2corr_global(imin,imax):
 #        print(i,dattot[i],theorytot[i],np.sqrt(cov[i,i]),np.power(diffs[i],2)/cov[i,i])
 
     try:
-        # out=calc_chi2(la.cholesky(cov, lower=True), diffs)
-        out=diffs@covin@diffs
+        out=calc_chi2(la.cholesky(cov, lower=True), diffs)
     except la.LinAlgError as err:
         print(err)
         print('t0 cov may be ill behaved, trying exp cov instead...')
@@ -1934,8 +1919,6 @@ def jaccalc_newmin(label_arr,label_arrm,eps_arr,hess_calc):
     # print(hessarr)
     # os.quit()
 
-    # fit_pars.pdf_dict=[]
-
     return(jacarr,hessarr,out0,out1,hessparr)
 
 def jaccalc(label_arr,label_arrm,eps_arr,hess_calc):
@@ -1995,8 +1978,8 @@ def jaccalc(label_arr,label_arrm,eps_arr,hess_calc):
             else:
                 
                 if ip==1:
-                    # tii0=hess_ii_calc_not0(theory0/eps_arr[ip],tarr[ip]/eps_arr[ip],cov0,cov0in)
-                    tii0=hess_ii_calc_not0(theory0,tarr[ip],cov0,cov0in)
+                    tii0=hess_ii_calc_not0(theory0/eps_arr[ip],tarr[ip]/eps_arr[ip],cov0,cov0in)
+                    # tii0=hess_ii_calc_not0(theory0,tarr[ip],cov0,cov0in)
                     tii=[tii0]
                     # print(np.sum((tarr[ip]-theory0)/eps_arr[ip]))
                     # print(tii0/np.power(eps_arr[ip],2))
@@ -2008,7 +1991,7 @@ def jaccalc(label_arr,label_arrm,eps_arr,hess_calc):
                 # print(ip,jp)
                 if ip==jp:
                     hii=tii[ip-1]
-                    hii=hii/np.power(eps_arr[ip],2)
+                    # hii=hii/np.power(eps_arr[ip],2)
                     hessarr[ip,jp]=hii
                 else:
                     if(chi2_pars.uset0cov):
@@ -2068,9 +2051,9 @@ def jaccalc(label_arr,label_arrm,eps_arr,hess_calc):
     
     jacarr=jacarr+chiarr
 
-    # print(jacarr)
-    # print(hessarr)
-    # os.quit()
+    print(jacarr)
+    print(hessarr)
+    os.quit()
 
     return(jacarr,hessarr,out0,out1,hessparr)
     
@@ -2205,9 +2188,9 @@ def jaccalc_d2(label_arr,label_arrm,eps_arr,hess_calc,il,ih):
             # print(iu,diffu)
             hessarr[iuv-1,iuv-1]=hessarr[iuv-1,iuv-1]+hessu
 
-    # print(jacarr)
-    # print(hessarr)
-    # os.quit()
+    print(jacarr)
+    print(hessarr)
+    os.quit()
 
     return (out0,out1,jacarr,hessarr)
 
@@ -2252,17 +2235,66 @@ def hess_zeros(hess):
    
     return hessd2
 
+#  allows theory values in covariance matrix to be overwritten if need be (for MSHT)
+
 def calc_covmat_t0(inpt0):
 
+    # cov = API.dataset_inputs_t0_covmat_from_systematics(**inpt0)
+
     lcd = API.dataset_inputs_loaded_cd_with_cuts(dataset_inputs=dload_pars.dscomb,theoryid=fit_pars.theoryidi,use_cuts='internal')
+    # preds=API.dataset_inputs_t0_predictions(**inpt0)
+    # theory=theory_calc(i,dataset_testii,inptt,fit_pars.cftrue[i])
     dtest=API.data_input(**inpt0)
 
     list_preds=list(fit_pars.preds_stored.keys())
+
+    # print(fit_pars.preds_stored)
+    # print(preds)
+    # os.quit()
 
     preds=[]
     for label in list_preds:
         preds.append(np.array(fit_pars.preds_stored[label]))
 
+    # for label in list_preds:
+    #     print(label)
+    #     id=list(fit_pars.preds_stored.keys()).index(label)
+    #     preds[id]=np.array(fit_pars.preds_stored[label])
+
+    # if 'MSHT-TTbar-TOT_X-SEC' in list_preds:
+    #     # print('TEST')
+    #     # print(np.array(fit_pars.preds_stored["MSHT-TTbar-ATLAS-7TeV_X-SEC"]))
+    #     id=list(fit_pars.preds_stored.keys()).index('MSHT-TTbar-TOT_X-SEC')
+    #     preds[id]=np.array(fit_pars.preds_stored["MSHT-TTbar-TOT_X-SEC"])
+    #     # print(preds[id])
+    # elif 'MSHT-CMS_Z_7TEV_ADD_Y' in list_preds:
+    #     id=list(fit_pars.preds_stored.keys()).index('MSHT-CMS_Z_7TEV_ADD_Y')
+    #     preds[id]=np.array(fit_pars.preds_stored["MSHT-CMS_Z_7TEV_ADD_Y"])
+    # elif 'MSHT-CMS_Z_7TEV_Y' in list_preds:
+    #     id=list(fit_pars.preds_stored.keys()).index('MSHT-CMS_Z_7TEV_Y')
+    #     preds[id]=np.array(fit_pars.preds_stored["MSHT-CMS_Z_7TEV_Y"])
+    # elif 'MSHT-CMS_Z0_7TEV_DIMUON_2D' in list_preds:
+    #     id=list(fit_pars.preds_stored.keys()).index('MSHT-CMS_Z0_7TEV_DIMUON_2D')
+    #     preds[id]=np.array(fit_pars.preds_stored["MSHT-CMS_Z0_7TEV_DIMUON_2D"])
+    # elif 'MSHT-CMS_Z0_7TEV_DIMUON_ADD_2D' in list_preds:
+    #     id=list(fit_pars.preds_stored.keys()).index('MSHT-CMS_Z0_7TEV_DIMUON_ADD_2D')
+    #     preds[id]=np.array(fit_pars.preds_stored["MSHT-CMS_Z0_7TEV_DIMUON_ADD_2D"])
+    # elif 'MSHT-LHCb15WZ_RAP' in list_preds:
+    #     id=list(fit_pars.preds_stored.keys()).index('MSHT-LHCb15WZ_RAP')
+    #     preds[id]=np.array(fit_pars.preds_stored["MSHT-LHCb15WZ_RAP"])
+    # elif 'MSHT-LHCb15WZ_ADD_RAP' in list_preds:
+    #     id=list(fit_pars.preds_stored.keys()).index('MSHT-LHCb15WZ_ADD_RAP')
+    #     preds[id]=np.array(fit_pars.preds_stored["MSHT-LHCb15WZ_ADD_RAP"])
+    # elif 'MSHT-D0wasym_Y' in list_preds:
+    #     id=list(fit_pars.preds_stored.keys()).index('MSHT-D0wasym_Y')
+    #     preds[id]=np.array(fit_pars.preds_stored["MSHT-D0wasym_Y"])
+    # # elif 'MSHT-AT7jets_MSHTMULT_PT-Y' in list_preds:
+    # #     id=list(fit_pars.preds_stored.keys()).index('MSHT-AT7jets_MSHTMULT_PT-Y')
+    # #     input_theory="test.dat"
+    # #     preds[id]=np.loadtxt(input_theory)        
+
     cov = dataset_inputs_covmat_from_systematics(lcd,dtest,True,None,preds)
+
+    # cov = dataset_inputs_covmat_from_systematics(lcd,dtest,True,None,fit_pars.preds_stored)
 
     return cov
