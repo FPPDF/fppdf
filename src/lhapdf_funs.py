@@ -7,8 +7,8 @@ import shutil as sh
 def initlha(name,lhdir):
 
     
-#    dirin=pdf_pars.lhapdfdir+'test/'+'NNPDF40_nnlo_pch_as_01180.info'
-    dirin=pdf_pars.lhapdfdir+'MSHT20nnlo_as118/'+'MSHT20nnlo_as118_mem1.info'
+    # dirin=pdf_pars.lhapdfdir+'NNPDF40_nnlo_pch_as_01180/'+'NNPDF40_nnlo_pch_as_01180.info'
+    dirin='input/MSHT20nnlo_as118_mem1.info'
     
     dirlha=lhdir+name+'/'
 
