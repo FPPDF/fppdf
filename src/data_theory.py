@@ -231,11 +231,23 @@ def _predictions_2pdfs_new(dataset, fkfunc, pdf1, pdf2=None):
         fkapp=fk_den_1
         all_predictions_r1.append(fkapp)
 
-        fk_num_1=fkfunc(fk_w_cuts_arr[0], pdf1)
-        fk_den_12=fkfunc(fk_w_cuts_arr[1], pdf1, pdf2)+fkfunc(fk_w_cuts_arr[1], pdf2, pdf1)
-        fkapp=fk_num_1*fk_den_12
+        # fk_num_1=fkfunc(fk_w_cuts_arr[0], pdf1)
+        # fk_den_12=fkfunc(fk_w_cuts_arr[1], pdf1, pdf2)+fkfunc(fk_w_cuts_arr[1], pdf2, pdf1)
+        # fkapp=fk_num_1*fk_den_12
+        # all_predictions_r2.append(fkapp)
+        # fkapp=np.power(fk_den_1,2)
+        # all_predictions_r2.append(fkapp)
+
+        fk_num_1=fkfunc(dataset,fk_w_cuts_arr[0], pdf1,None,0)
+        fk_den_12=fkfunc(dataset,fk_w_cuts_arr[1], pdf1, pdf2,1)+fkfunc(dataset,fk_w_cuts_arr[1], pdf2, pdf1,1)
+        # Corrected so that works when denominator is single number
+        # fkapp=fk_num_1*fk_den_12
+        fkapp=fk_num_1
+        # print(fkapp)
         all_predictions_r2.append(fkapp)
-        fkapp=np.power(fk_den_1,2)
+        # fkapp=np.power(fk_den_1,2)
+        fkapp=np.power(fk_den_1,2)/fk_den_12
+        # print(fkapp)
         all_predictions_r2.append(fkapp)
 
     if dataset.op == 'ASY' and pdf2 is not None:
