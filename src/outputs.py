@@ -59,7 +59,7 @@ def evgrido():
         pset = lhapdf.getPDFSet(pdf_pars.PDFlabel_lhin)
         pdfs = pset.mkPDFs()
 
-    if fit_pars.theoryidi==211 or fit_pars.theoryidi==40001000:
+    if fit_pars.theoryidi==211 or fit_pars.theoryidi==40001000 or fit_pars.theoryidi==50001000:
         qin=1.00
     elif fit_pars.theoryidi==200:
         qin=1.65
