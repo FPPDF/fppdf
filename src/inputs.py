@@ -142,7 +142,7 @@ def readin():
 
 #   Set charm to zero if p. charm theory!
     nchm=basis_pars.i_ch_max-basis_pars.i_ch_min    
-    if fit_pars.theoryidi==211 or fit_pars.theoryidi==212 or fit_pars.theoryidi==40001000:
+    if fit_pars.theoryidi==211 or fit_pars.theoryidi==212 or fit_pars.theoryidi==40001000 or fit_pars.theoryidi==50001000:
         if basis_pars.Cheb_8:
             distcharm=np.zeros((11,2))
         else:
@@ -227,7 +227,7 @@ def readin_Cheb8():
         distcharm=np.loadtxt(inputfile,skiprows=68,max_rows=9)
 
 #   Set charm to zero if p. charm theory!
-    if fit_pars.theoryidi==211 or fit_pars.theoryidi==40001000:
+    if fit_pars.theoryidi==211 or fit_pars.theoryidi==40001000 or fit_pars.theoryidi==50001000:
         distcharm=np.zeros((9,2))
 
     if fit_pars.theoryidi==212:
