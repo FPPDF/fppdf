@@ -1,10 +1,10 @@
 Readme (under construction) for fixpar_nnpdf code
 
-Requires NNPDF code from https://docs.nnpdf.science via conda installation. Tested for:
+Requires NNPDF code from https://docs.nnpdf.science either from source or conda
 
-conda install nnpdf python=3.9
-
-(I think python version may be needed for lhapdf to run though need to double check that)
+```
+    conda install nnpdf -c https://packages.nnpdf.science/conda -c conda-forge
+```
 
 To run simply execute:
 

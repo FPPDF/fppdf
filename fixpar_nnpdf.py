@@ -32,6 +32,13 @@ import pathlib
 from validphys.loader import _get_nnpdf_profile
 from validphys.lhaindex import get_lha_datapath
 
+lhapdf.setVerbosity(0)
+
+# Fake LHAPDF folder
+TEMP_LHAPDF = pathlib.Path("tmp_lhapdf")
+TEMP_LHAPDF.mkdir(exist_ok=True)
+lhapdf.pathsAppend(TEMP_LHAPDF.as_posix())
+
 sys.path.append("src/")
 
 from global_pars import *
@@ -248,7 +255,8 @@ if fit_pars.theoryidi==212:
     fit_pars.dataset_40=fit_pars.dataset_40_nlo
     fit_pars.imaxdat=len(fit_pars.dataset_40) 
 
-pdf_pars.lhapdfdir=get_lha_datapath()+'/'
+pdf_pars.lhapdfdir = get_lha_datapath() + "/"
+pdf_pars.tmp_lhapdfdir = TEMP_LHAPDF
 profile=_get_nnpdf_profile(None)
 fit_pars.datapath=pathlib.Path(profile["data_path"])
 # fit_pars.theories_path=pathlib.Path(profile["theories_path"])
@@ -610,3 +618,6 @@ else:
     resout(pospeni,pospenf,chi2t0i,chi2expi,chi2t0f,chi2expf,chi2_pars.ndat)
     t1=time.process_time()
     print('time= ',t1-tzero)
+
+
+# TODO Remove TEMP_LHAPDF at the end

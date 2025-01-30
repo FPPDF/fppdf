@@ -146,8 +146,8 @@ def chi2min_fun(afree,jac_calc,hess_calc):
                     pdf_pars.deld_arr[ip]=parin1[10]
                     pdf_pars.delu_arr[ip]=parin1[1]
                 
-                
             if(pdf_pars.uselha):
+                # TODO what about this
                 chi2_pars.ipdf_newmin=ip
                 initlha(name,pdf_pars.lhapdfdir)
                 pdf_pars.PDFlabel=name
@@ -175,7 +175,7 @@ def chi2min_fun(afree,jac_calc,hess_calc):
                     pdf_pars.delu_arr[pdf_pars.npar_free+ip]=parin1[1]
 
                 if(pdf_pars.uselha):
-                    
+                    # TODO what about this 2
                     initlha(name,pdf_pars.lhapdfdir)
                     pdf_pars.PDFlabel=name
                     writelha(name,pdf_pars.lhapdfdir,parin1) 
@@ -199,7 +199,6 @@ def chi2min_fun(afree,jac_calc,hess_calc):
                 idir_j=pdf_pars.idir+ip
                 name=inout_pars.label+'_run'+str(idir_j)
                 # name=inout_pars.label+'_irep'+str(fit_pars.irep)+'_run'+str(idir_j)
-                dellha(name)
                 
             pdf_pars.idir+=pdf_pars.npar_free+1
 
@@ -209,7 +208,6 @@ def chi2min_fun(afree,jac_calc,hess_calc):
                     idir_j=pdf_pars.idir+ip
                     name=inout_pars.label+'_run'+str(idir_j)
                     # name=inout_pars.label+'_irep'+str(fit_pars.irep)+'_run'+str(idir_j)
-                    dellha(name)
 
                 pdf_pars.idir+=pdf_pars.npar_free
         
@@ -226,16 +224,16 @@ def chi2min_fun(afree,jac_calc,hess_calc):
 
         # write to temp lhapdf grid to be used by nnpdf code
         if(pdf_pars.uselha):
-            initlha(name,pdf_pars.lhapdfdir)
+            # TODO: instead of writting a temporary LHAPDF grid, create a validphys interface
+            initlha(name, pdf_pars.tmp_lhapdfdir)
             pdf_pars.PDFlabel=name
             chi2_pars.ipdf_newmin=0
-            writelha(name,pdf_pars.lhapdfdir,parin1)    
+            writelha(name,pdf_pars.tmp_lhapdfdir,parin1)    
+
         # calculate chi2
         chi=chi2totcalc()
         out=chi[0]+chi[1] # exp + positivity
         out0=chi[0]
-        if(pdf_pars.uselha):
-            dellha(name) # delete temporary folder
         pdf_pars.idir+=1 # iterate up so new folder
 
         print('chi2/N_dat=',out/chi2_pars.ndat)                                                                                             

@@ -112,6 +112,8 @@ class pdf_pars:
     PDFlabel_cent='init'
     # absolute path to LHAPDF directory where grids are stored
     lhapdfdir='init'
+    # path to the temporary LHAPDF files
+    tmp_lhapdfdir = None # Path
     # counter to ensure new lhapdf grid used for every new theory evaluation
     idir=0
     # if true then use lhapdf grids for theory evaluation 

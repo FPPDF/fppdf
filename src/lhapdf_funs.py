@@ -1,3 +1,4 @@
+from pathlib import Path
 from global_pars import *
 from pdfs import *
 import lhapdf
@@ -9,27 +10,19 @@ def initlha(name,lhdir):
     
     # dirin=pdf_pars.lhapdfdir+'NNPDF40_nnlo_pch_as_01180/'+'NNPDF40_nnlo_pch_as_01180.info'
     dirin='input/MSHT20nnlo_as118_mem1.info'
-    
-    dirlha=lhdir+name+'/'
 
-
-
-    try: 
-        os.mkdir(dirlha) 
-    except OSError as error: 
-        print(error)
+    lhdir = Path(lhdir)
+    dirlha = lhdir / name 
+    dirlha.mkdir(exist_ok = True, parents=True)
         
-    sh.copy(dirin,dirlha+name+'.info')
+    sh.copy(dirin, dirlha / f"{name}.info")
 
 def writelha(name,lhdir,parin):
 
-    output=lhdir+name+'/'+name+'_0000.dat'
+    lhdir = Path(lhdir)
+    output = lhdir / name / f"{name}_0000.dat"
 
-    # print(pdf_pars.parinarr[0,:])
-    # print(parin)
-
-    with open(output,'w') as outputfile:
-    
+    with output.open("w") as outputfile:
         outputfile.write('PdfType: replica')                                                   
         outputfile.write('\n')
         outputfile.write('Format: lhagrid1')
@@ -38,7 +31,7 @@ def writelha(name,lhdir,parin):
 
  #        PDFlabelmsht='MSHT20nnlo_as118'
         PDFlabelmsht='NNPDF40_nnlo_pch_as_01180'
-        inputf=pdf_pars.lhapdfdir+PDFlabelmsht+'/'+PDFlabelmsht+'_0000.dat'
+        inputf=Path(pdf_pars.lhapdfdir) / PDFlabelmsht / f"{PDFlabelmsht}_0000.dat"
         filein=open(inputf,"r")
         content=filein.readlines()
         
@@ -265,7 +258,3 @@ def writelha_end(name,lhdir,parin):
                 outputfile.write('\n')
 
         outputfile.write('---')
-
-def dellha(name):
-    dirlha=pdf_pars.lhapdfdir+name+'/'
-    sh.rmtree(dirlha)
