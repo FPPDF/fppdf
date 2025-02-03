@@ -6,6 +6,14 @@ Requires NNPDF code from https://docs.nnpdf.science either from source or conda
     conda install nnpdf -c https://packages.nnpdf.science/conda -c conda-forge
 ```
 
+> [!IMPORTANT]
+> To run with this branch, it is necessary to install the specific ``api_extended_feb25`` branch [PR](https://github.com/NNPDF/nnpdf/pull/2268)
+
+```bash
+python -m pip install git+https://github.com/NNPDF/nnpdf.git@api_extended_feb25 --no-deps # no-deps to avoid overwriting dependencies by conda
+```
+
+
 To run simply execute:
 
 python fixpar_nnpdf.py --config=configs/**.yaml

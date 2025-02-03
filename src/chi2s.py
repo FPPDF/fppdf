@@ -4,6 +4,10 @@ import scipy.linalg as la
 from data_theory import *
 from validphys.calcutils import calc_chi2
 from validphys.covmats import dataset_inputs_t0_covmat_from_systematics, dataset_inputs_covmat_from_systematics
+
+from validphys.api import API
+from validphys.convolution import central_predictions
+
 from pdfs import *
 from inputs import *
 from lhapdf_funs import *
@@ -227,11 +231,15 @@ def chi2min_fun(afree,jac_calc,hess_calc):
             # TODO: instead of writting a temporary LHAPDF grid, create a validphys interface
             initlha(name, pdf_pars.tmp_lhapdfdir)
             pdf_pars.PDFlabel=name
+            writelha(name,pdf_pars.tmp_lhapdfdir,parin1)
             chi2_pars.ipdf_newmin=0
-            writelha(name,pdf_pars.tmp_lhapdfdir,parin1)    
+            vp_pdf = MSHTPDF(name = name, pdf_parameters = parin1, pdf_function = "msht")
+            pdf_pars.vp_pdf = vp_pdf
 
-        # calculate chi2
-        chi=chi2totcalc()
+
+        # TODO calculate chi2
+        print("> Calculating chi2 <")
+        chi=chi2totcalc(vp_pdf=vp_pdf)
         out=chi[0]+chi[1] # exp + positivity
         out0=chi[0]
         pdf_pars.idir+=1 # iterate up so new folder
@@ -257,13 +265,14 @@ def chi2min_fun(afree,jac_calc,hess_calc):
 
     return(out,jac,hess,err,hessp)
 
-def chi2corr(imin,imax):
-
+def chi2corr(imin, imax, vp_pdf=None):
+    # TODO: add docstr
+    """ """
     if(pdf_closure.pdpdf):
         (out,theorytot,cov,covin)=chi2corr_pdf()
         diffs_out=0.
     else:
-        (out,theorytot,cov,covin,diffs_out)=chi2corr_global(imin,imax)
+        (out,theorytot,cov,covin,diffs_out)=chi2corr_global(imin, imax, vp_pdf)
 
     return (out,theorytot,cov,covin,diffs_out)
     
@@ -658,8 +667,11 @@ def chi2corr_ind(i):
 
     return (out,ndat,dlabel)
 
-def chi2corr_global(imin,imax):
-
+def chi2corr_global(imin, imax, vp_pdf=None):
+    """Compute chi2 for the global dataset.
+    Takes from index 0 of the dataset all the way to index imax
+    as defined in ``global_pars.fit_pars.dataset_40``.
+    """
 
     if fit_pars.nlo_cuts:
         # intersection=[{"dataset_inputs": dload_pars.dscomb, "theoryid": 212}]
@@ -727,15 +739,23 @@ def chi2corr_global(imin,imax):
 
     # outputfile_label=open('outputs/pseudodata/datalabels.dat','w')
 
+    # TODO: in principle this entire loop could be replaced by a direct call to calc_chi2 with the following input
+    # 1. covmat -> needs information on t0 (on/off), datasets, cuts
+    # 2. data -> needs datasets, cuts, replica seed (if needed)
+    # 3. theory results -> data, cuts, theory
+    # if the replicas were prepared beforehand that would speed up things though
+
+    vp_input = {"use_cuts": "internal", "theoryid": fit_pars.theoryidi}
+    if vp_pdf is not None:
+        vp_input["pdf"] = vp_pdf
+    all_ds_input = []
+
     for i in range(imin,imax+1):
         dataset_testii=fit_pars.dataset_40[i]  
-        
-        # print(fit_pars.dataset_40[i])
-        inptt = {                                                                                                                 
-                "dataset_input": dataset_testii,                                                                                      
-                "use_cuts": "internal",                                                                                               
-                "theoryid": fit_pars.theoryidi,                                                                         
-            }      
+
+        inptt = {**vp_input, "dataset_input": dataset_testii}
+        all_ds_input.append(dataset_testii)
+
         # if fit_pars.nlo_cuts:
         #     # inptt = {                          
         #     #     "cuts_intersection_spec": [{"theoryid": 212, "theoryid": 211}],                                                                                      
@@ -757,8 +777,13 @@ def chi2corr_global(imin,imax):
         #         "use_cuts": "internal",                                                                                               
         #         "theoryid": fit_pars.theoryidi,                                                                         
         #     }    
-               
-        theory=theory_calc(i,dataset_testii,inptt,fit_pars.cftrue[i])
+
+        if vp_pdf is not None:
+            # NB: checked that it produce the same values as the line below
+            theory = API.central_predictions(**inptt).values[:,0]
+        else:
+            theory=theory_calc(i,dataset_testii,inptt,fit_pars.cftrue[i])
+
         fit_pars.preds_stored[str(dataset_testii["dataset"])]=theory
 
         # for j in range (0,len(theory)):
@@ -825,8 +850,22 @@ def chi2corr_global(imin,imax):
     # print(len(theorytot))
     # exit()
 
+    if vp_pdf is not None:
+        # Get the covmat for all the dataset we have calculated chi2 for. The order is the same as the vector of theories
+        # TODO: eventually we'll try to skip it and compute the chi2 directly
+        # TODO: in principle nlo intersenction cut should already be part of vp_input at this stage
+        cov = API.dataset_inputs_covmat_t0_considered(**vp_input, dataset_inputs = all_ds_input, use_t0=chi2_pars.t0, t0pdfset=vp_pdf)
+        covin = la.inv(cov)
 
-    if(chi2_pars.t0):
+        if chi2_pars.t0:
+            dload_pars.covt0=cov
+            dload_pars.covt0_inv=covin
+            dload_pars.dcov=0
+        else:
+            dload_pars.covexp=cov
+            dload_pars.covexp_inv=covin
+
+    elif(chi2_pars.t0):
         print('t0 cov1...')
         if fit_pars.nlo_cuts:
             inpt0 = dict(dataset_inputs=dload_pars.dscomb, theoryid=fit_pars.theoryidi, use_cuts="fromintersection", cuts_intersection_spec=intersection, t0pdfset=pdf_pars.PDFlabel, use_t0=True)
@@ -1013,6 +1052,8 @@ def chi2corr_global(imin,imax):
 #                dload_pars.darr_gl=dattot
     else:
         dattot=dload_pars.darr_gl
+
+    import ipdb; ipdb.set_trace()
 
     chi2_pars.ndat=len(dattot)   
 
@@ -1244,11 +1285,13 @@ def chilim_fill(nd,chi,dlab):
     chi2_pars.chi0_ind_arr.append(chi)
     # print(i,chilim/chi,cl68,cl50,cl68/cl50,nd)
 
-def chi2totcalc():
+def chi2totcalc(vp_pdf=None):
+    """If a VP pdf is used, use VP to compute the chi2"""
 
-    
-    chiarr=np.zeros(fit_pars.imaxdat-fit_pars.imindat)
-    chiarr[0]=chi2corr(fit_pars.imindat,fit_pars.imaxdat-1)[0]
+    # Prepare an array to save the chi2 for each dataset
+    chiarr = np.zeros(fit_pars.imaxdat - fit_pars.imindat)
+
+    chiarr[0] = chi2corr(fit_pars.imindat, fit_pars.imaxdat - 1, vp_pdf=vp_pdf)[0]
 
     ndtot=0
     chi2totind=0.

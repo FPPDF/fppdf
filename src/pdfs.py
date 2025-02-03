@@ -5,6 +5,67 @@ import os
 from scipy.integrate import quadrature
 from scipy.misc import derivative as deriv
 
+from validphys.core import PDF
+from validphys.lhapdfset import LHAPDFSet
+
+
+class MSHTSet(LHAPDFSet):
+    """Provides a few lhapdf-like functions to trick vp into thinking it is an LHAPDFset
+    Can work with any function with a signature of (flavour, parameters, x)
+    """
+
+    def __init__(self, pdf_function, parameters, name):
+        self._error_type = "replicas"
+        self._name = name
+        self._flavors = None
+        self._lhapdf_set = [None]
+
+        self._parameters = parameters
+        self._pdf_function = pdf_function
+
+    def xfxQ(self, x, Q, n, fl):
+        """Return the PDF value for one single point for one single member
+        Note that in this case both scale (Q) and member (n) are ignored.
+        """
+        return self._pdf_function(fl, self._parameters, x)
+
+    def grid_values(self, flavors: np.ndarray, xgrid: np.ndarray, qgrid: np.ndarray):
+        """Returns the PDF values for every member for the required flavors, x, q
+
+        For the time being assume there is only one Q and only one member
+        Return shape: (members, flavours, xgrid, qgrid)
+        """
+        out_ret = []
+        for fl in flavors:
+            tmp = []
+            for x in xgrid:
+                tmp.append(self.xfxQ(x, None, None, fl))
+            out_ret.append(tmp)
+        return np.array(out_ret).reshape(len(flavors), 1, -1, 1)
+
+
+class MSHTPDF(PDF):
+    """
+    Creates a MSHT PDF object, extends validphys' PDF object
+    to utilize a MSHT set in the background instead of lhapdf / pdfflow
+    """
+
+    def __init__(
+        self,
+        name="msht",
+        boundary=None,
+        pdf_function="msht",
+        pdf_parameters=None,
+        Q=1.0,
+    ):
+        if isinstance(pdf_function, str):
+            if pdf_function == "msht":
+                pdf_function = pdfs_msht
+
+        self._lhapdf_set = MSHTSet(pdf_function, pdf_parameters, name)
+        super().__init__(name, None)
+
+
 def func_pdfs_diff(eps,ipdf,x,iorder):
 
     # print(eps)
