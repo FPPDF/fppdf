@@ -73,18 +73,20 @@ def del_pen_calc():
 
     return (chi0d,chi0u,diffd,diffu,hessd,hessu,idv,iuv)
 
-def pos_calc(pdata):
+def pos_calc(pdata, vp_pdf=None):
 
     tot=0.
     totdiff=0.
+    if vp_pdf is None:
+        vp_pdf = pdf_pars.PDFlabel
 
     
     for j in range(0,len(pdata)):
     
         if fit_pars.theoryidi==40001000 or fit_pars.theoryidi==50001000:            
-            api_predictions = API.positivity_predictions_data_result(theoryid=fit_pars.theoryidi, pdf=pdf_pars.PDFlabel, posdataset=pdata[j],use_cuts="internal")
+            api_predictions = API.positivity_predictions_data_result(theoryid=fit_pars.theoryidi, pdf=vp_pdf, posdataset=pdata[j],use_cuts="internal")
         else:
-            api_predictions = API.positivity_predictions_data_result(theoryid=fit_pars.theoryidi, pdf=pdf_pars.PDFlabel, posdataset=pdata[j])
+            api_predictions = API.positivity_predictions_data_result(theoryid=fit_pars.theoryidi, pdf=vp_pdf, posdataset=pdata[j])
         out=api_predictions.central_value
 
         # print(pdata[j])

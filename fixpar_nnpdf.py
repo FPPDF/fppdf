@@ -34,10 +34,10 @@ from validphys.lhaindex import get_lha_datapath
 
 lhapdf.setVerbosity(0)
 
-# Fake LHAPDF folder
-TEMP_LHAPDF = pathlib.Path("tmp_lhapdf")
-TEMP_LHAPDF.mkdir(exist_ok=True)
-lhapdf.pathsAppend(TEMP_LHAPDF.as_posix())
+# # Fake LHAPDF folder, no longer needed
+# TEMP_LHAPDF = pathlib.Path("tmp_lhapdf")
+# TEMP_LHAPDF.mkdir(exist_ok=True)
+# lhapdf.pathsAppend(TEMP_LHAPDF.as_posix())
 
 sys.path.append("src/")
 
@@ -256,7 +256,7 @@ if fit_pars.theoryidi==212:
     fit_pars.imaxdat=len(fit_pars.dataset_40) 
 
 pdf_pars.lhapdfdir = get_lha_datapath() + "/"
-pdf_pars.tmp_lhapdfdir = TEMP_LHAPDF
+# pdf_pars.tmp_lhapdfdir = TEMP_LHAPDF
 profile=_get_nnpdf_profile(None)
 fit_pars.datapath=pathlib.Path(profile["data_path"])
 # fit_pars.theories_path=pathlib.Path(profile["theories_path"])

@@ -1,5 +1,6 @@
 from global_pars import *
 from chebyshevs import *
+from copy import deepcopy
 import numpy as np
 import os
 from scipy.integrate import quadrature
@@ -14,8 +15,8 @@ class MSHTSet(LHAPDFSet):
     Can work with any function with a signature of (flavour, parameters, x)
     """
 
-    def __init__(self, pdf_function, parameters, name):
-        self._error_type = "replicas"
+    def __init__(self, pdf_function, parameters, name, error_type="replicas"):
+        self._error_type = error_type
         self._name = name
         self._flavors = None
         self._lhapdf_set = [None]
@@ -41,7 +42,7 @@ class MSHTSet(LHAPDFSet):
             for x in xgrid:
                 tmp.append(self.xfxQ(x, None, None, fl))
             out_ret.append(tmp)
-        return np.array(out_ret).reshape(len(flavors), 1, -1, 1)
+        return np.array(out_ret).reshape(1, len(flavors), -1, 1)
 
 
 class MSHTPDF(PDF):
@@ -64,6 +65,17 @@ class MSHTPDF(PDF):
 
         self._lhapdf_set = MSHTSet(pdf_function, pdf_parameters, name)
         super().__init__(name, None)
+
+        # Create some fake info:
+        self._info = {"NumMembers": 1}
+
+    def load(self):
+        return self._lhapdf_set
+
+    def load_t0(self):
+        t0_version = deepcopy(self._lhapdf_set)
+        t0_version._error_type = "t0"
+        return t0_version
 
 
 def func_pdfs_diff(eps,ipdf,x,iorder):

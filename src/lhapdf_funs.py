@@ -6,9 +6,6 @@ import os
 import shutil as sh
 
 
-
-
-
 def initlha(name,lhdir):
 
     

@@ -229,13 +229,12 @@ def chi2min_fun(afree,jac_calc,hess_calc):
         # write to temp lhapdf grid to be used by nnpdf code
         if(pdf_pars.uselha):
             # TODO: instead of writting a temporary LHAPDF grid, create a validphys interface
-            initlha(name, pdf_pars.tmp_lhapdfdir)
-            pdf_pars.PDFlabel=name
-            writelha(name,pdf_pars.tmp_lhapdfdir,parin1)
+            # in principle this is no longer necessary
+#             initlha(name, pdf_pars.tmp_lhapdfdir)
+#             pdf_pars.PDFlabel=name
+#             writelha(name,pdf_pars.tmp_lhapdfdir,parin1)
             chi2_pars.ipdf_newmin=0
             vp_pdf = MSHTPDF(name = name, pdf_parameters = parin1, pdf_function = "msht")
-            pdf_pars.vp_pdf = vp_pdf
-
 
         # TODO calculate chi2
         print("> Calculating chi2 <")
@@ -1198,8 +1197,6 @@ def jac_fun(afree):
     return out
 
 def chi2min(afree):
-
-
     hess_calc=False
     jac_calc=False
     outarr=chi2min_fun(afree,jac_calc,hess_calc)
@@ -1406,9 +1403,10 @@ def chi2totcalc(vp_pdf=None):
 
     out1=0.
     if fit_pars.pos_const:
-        out31=pos_calc(fit_pars.pos_data31)
+
+        out31=pos_calc(fit_pars.pos_data31, vp_pdf=vp_pdf)
         if(fit_pars.pos_40):
-            out40=pos_calc(fit_pars.pos_data40)
+            out40=pos_calc(fit_pars.pos_data40, vp_pdf=vp_pdf)
             chi2pos=out31+out40
             out1=chi2pos
         else:
