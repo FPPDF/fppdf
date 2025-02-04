@@ -24,7 +24,7 @@ from validphys.pseudodata import make_replica
 from scipy.optimize import minimize
 from scipy.optimize import least_squares
 import itertools as IT
-from reportengine.compat import yaml
+from reportengine.utils import yaml_safe
 import time
 import sys
 import argparse
@@ -61,7 +61,7 @@ args = parser.parse_args()
 # Loading yaml config
 ##################
 with open(args.config, 'r') as file:
-        config = yaml.safe_load(file)
+        config = yaml_safe.load(file)
 
 inp = config.get("inputs", None)
 inout_pars.inputnam=inp.get("input file")

@@ -2,7 +2,7 @@ from global_pars import *
 from pdfs import *
 import numpy as np
 import os
-from reportengine.compat import yaml
+from reportengine.utils import yaml_safe
 from lhapdf_funs import *
 
 def covmatout(hessi,jaci):
@@ -173,7 +173,7 @@ def evgrido():
 
     
     with open(output,'w') as outputfile:
-        yaml.dump(data, outputfile)
+        yaml_safe.dump(data, outputfile)
 
 def resout_nofit(pospeni,chi2t0i,chi2expi,n):
     outputfile=open('outputs/res/'+inout_pars.label+'.dat','w')
