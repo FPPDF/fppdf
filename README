@@ -7,10 +7,10 @@ Requires NNPDF code from https://docs.nnpdf.science either from source or conda
 ```
 
 > [!IMPORTANT]
-> To run with this branch, it is necessary to install the specific ``api_extended_feb25`` branch [PR](https://github.com/NNPDF/nnpdf/pull/2268)
+> To run with this branch, it is necessary to install the latest NNPDF as the possibility of using the custom PDF class was introduce here [PR](https://github.com/NNPDF/nnpdf/pull/2268)
 
 ```bash
-python -m pip install git+https://github.com/NNPDF/nnpdf.git@api_extended_feb25 --no-deps # no-deps to avoid overwriting dependencies by conda
+python -m pip install git+https://github.com/NNPDF/nnpdf.git --no-deps # no-deps to avoid overwriting dependencies by conda
 ```
 
 

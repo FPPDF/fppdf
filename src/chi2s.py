@@ -1053,8 +1053,6 @@ def chi2corr_global(imin, imax, vp_pdf=None):
     else:
         dattot=dload_pars.darr_gl
 
-    import ipdb; ipdb.set_trace()
-
     chi2_pars.ndat=len(dattot)   
 
     diffs=dattot-theorytot
