@@ -20,6 +20,7 @@ def initlha(name,lhdir):
 
 def writelha(name,lhdir,parin):
     print(f"Writing {name}")
+    # import ipdb; ipdb.set_trace()
 
     lhdir = Path(lhdir)
     output = lhdir / name / f"{name}_0000.dat"
@@ -43,8 +44,6 @@ def writelha(name,lhdir,parin):
 #        xarr=np.loadtxt(inputf,skiprows=4,max_rows=1)
         # msht
         xarr=np.loadtxt(inputf,skiprows=3,max_rows=1)
-        
-
 
 
         nx=1000

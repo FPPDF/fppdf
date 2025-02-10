@@ -2,7 +2,6 @@ from global_pars import *
 from chebyshevs import *
 from copy import deepcopy
 import numpy as np
-import os
 from scipy.integrate import quadrature
 from scipy.misc import derivative as deriv
 
@@ -28,6 +27,8 @@ class MSHTSet(LHAPDFSet):
         """Return the PDF value for one single point for one single member
         Note that in this case both scale (Q) and member (n) are ignored.
         """
+        if fl == 21:
+            fl = 0
         return self._pdf_function(fl, self._parameters, x)
 
     def grid_values(self, flavors: np.ndarray, xgrid: np.ndarray, qgrid: np.ndarray):
@@ -62,6 +63,10 @@ class MSHTPDF(PDF):
         if isinstance(pdf_function, str):
             if pdf_function == "msht":
                 pdf_function = pdfs_msht
+            elif pdf_function == "diff":
+                pdf_function = pdfs_diff
+            else:
+                raise NotImplementedError(f"{pdf_function=}")
 
         self._lhapdf_set = MSHTSet(pdf_function, pdf_parameters, name)
         super().__init__(name, None)
@@ -98,10 +103,18 @@ def func_pdfs_diff(eps,ipdf,x,iorder):
 
     return out
 
-def pdfs_diff(ipdf,x):
-
+def pdfs_diff(ipdf, parin=None, x=None):
     eps=1e-5
     # (pars,eps_out)=parinc_newmin(pdf_pars.parinarr[0,:],chi2_pars.ipdf_newmin-1,eps)
+
+    # TODO
+    # Here we are assuming that we always want to set parinarr[0] == parin
+    # this might not be true in all scenarios.
+    if x is None:
+        # So that the old interface works as well
+        x = parin
+    else:
+        pdf_pars.parinarr[0,:] = parin
     eps=parinc_eps(pdf_pars.parinarr[0,:],chi2_pars.ipdf_newmin-1,eps)
 
     # # pdfout=pdfs_msht(ipdf,pars,x)-pdfs_msht(ipdf,pdf_pars.parinarr[0,:],x)
@@ -123,10 +136,10 @@ def pdfs_diff(ipdf,x):
     return pdfout
 
 def pdfs_msht(ipdf,pars,x):
-
-    
+    """
+        Compute a MSHT PDF given a set of parameters ``pars'' for x=x
+    """
     etaq=pars[57]
-
 
     if etaq < 0.0:
         etaqt=np.power(1.-x,-etaq)

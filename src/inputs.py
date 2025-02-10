@@ -1,19 +1,6 @@
 from global_pars import *
 import numpy as np
-from pathlib import Path
-
-OUTPUT_F = Path("outputs")
-BUFFER_F = OUTPUT_F / "buffer"
-PARS_F = OUTPUT_F / "pars"
-EVGRIDS_F = OUTPUT_F / "evgrids"
-PLOTS_F = OUTPUT_F / "plots"
-RES_F = OUTPUT_F / "res"
-PARS_F.mkdir(exist_ok=True, parents=True)
-EVGRIDS_F.mkdir(exist_ok=True, parents=True)
-PLOTS_F.mkdir(exist_ok=True, parents=True)
-RES_F.mkdir(exist_ok=True, parents=True)
-
-
+from outputs import BUFFER_F
 
 def readincov():
 
@@ -193,7 +180,6 @@ def readin():
     afin=np.delete(afin,0)
     pdf_pars.par_free_i=np.delete(pdf_pars.par_free_i,0)
     
-    BUFFER_F.mkdir(exist_ok = True, parents=True)
     outputfile = (BUFFER_F / f"{inout_pars.label}.dat").open("w")
     outputfile.write("Starting new buffer...")
     outputfile.write("\n")

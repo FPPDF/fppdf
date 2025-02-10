@@ -5,13 +5,23 @@ import os
 from reportengine.utils import yaml_safe
 from lhapdf_funs import *
 
+OUTPUT_F = Path("outputs")
+BUFFER_F = OUTPUT_F / "buffer"
+PARS_F = OUTPUT_F / "pars"
+EVGRIDS_F = OUTPUT_F / "evgrids"
+PLOTS_F = OUTPUT_F / "plots"
+RES_F = OUTPUT_F / "res"
+COV_F = OUTPUT_F / "cov"
+for PF in [BUFFER_F, PARS_F, EVGRIDS_F, PLOTS_F, RES_F, COV_F]:
+    PF.mkdir(exist_ok=True, parents=True)
+
+
 def covmatout(hessi,jaci):
 
 #    hessin=hessi.copy()
 #    hessin=la.inv(hessin)
     pars=pdf_pars.pdfparsi.copy()
-
-    output='outputs/cov/'+inout_pars.label+'.dat'
+    output = COV_F / f"{inout_pars.label}.dat"
 
     print('call covmatout')
     print(output)
@@ -132,36 +142,19 @@ def evgrido():
         test[195,13]=0.
 
     if inout_pars.pd_output:    
-        dirgrid0='outputs/evgrids/'+inout_pars.pd_output_lab
-        dirgrid1='outputs/evgrids/'+inout_pars.pd_output_lab+'/nnfit'
-        dirgrid='outputs/evgrids/'+inout_pars.pd_output_lab+'/nnfit/replica_'+str(fit_pars.irep+1)+'/'
+        dirgrid0 = EVGRIDS_F / inout_pars.pd_output_lab
     else:
-        dirgrid0='outputs/evgrids/'+inout_pars.label
-        dirgrid1='outputs/evgrids/'+inout_pars.label+'/nnfit'
-        dirgrid='outputs/evgrids/'+inout_pars.label+'/nnfit/replica_'+str(fit_pars.irep+1)+'/'
-    
+        dirgrid0 = EVGRIDS_F / inout_pars.label
 
-    try:
-        os.mkdir(dirgrid0)
-    except OSError as error:
-        print(error)
-    
-    try:
-        os.mkdir(dirgrid1)
-    except OSError as error:
-        print(error)
-    
-    try:
-        os.mkdir(dirgrid)
-    except OSError as error:
-        print(error)
+    dirgrid1 = dirgrid0 / "nnfit"
+    dirgrid = dirgrid1 / f"replica_{str(fit_pars.irep+1)}"
+
+    dirgrid.mkdir(exist_ok = True, parents = True)
 
     if inout_pars.pd_output:   
-        output=dirgrid+inout_pars.pd_output_lab+'.exportgrid'
+        output = dirgrid / f"{inout_pars.pd_output_lab}.exportgrid"
     else:    
-        output=dirgrid+inout_pars.label+'.exportgrid'
-
-
+        output = dirgrid / f"{inout_pars.label}.exportgrid"
 
     data = {
         "replica": 1,
@@ -313,9 +306,7 @@ def parsout():
 
 def plotout():
 
-    outputdir='outputs/plots/'
-    
-    output=outputdir+inout_pars.label+'.dat'
+    output = PLOTS_F / f"{inout_pars.label}.dat"
 
     msht='MSHT20nnlo_as118'
     nnpdf='NNPDF40_nnlo_pch_as_01180'
