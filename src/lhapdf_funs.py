@@ -19,6 +19,7 @@ def initlha(name,lhdir):
     sh.copy(dirin, dirlha / f"{name}.info")
 
 def writelha(name,lhdir,parin):
+    print(f"Writing {name}")
 
     lhdir = Path(lhdir)
     output = lhdir / name / f"{name}_0000.dat"
@@ -107,7 +108,6 @@ def writelha(name,lhdir,parin):
 #        os.quit()
 
         for ix in range(0,nx):
-            
             for iq in range(0,2):
                 xin=xarr[ix]
 

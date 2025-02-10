@@ -33,12 +33,6 @@ from validphys.loader import _get_nnpdf_profile
 from validphys.lhaindex import get_lha_datapath
 
 lhapdf.setVerbosity(0)
-
-# # Fake LHAPDF folder, no longer needed
-# TEMP_LHAPDF = pathlib.Path("tmp_lhapdf")
-# TEMP_LHAPDF.mkdir(exist_ok=True)
-# lhapdf.pathsAppend(TEMP_LHAPDF.as_posix())
-
 sys.path.append("src/")
 
 from global_pars import *
@@ -51,6 +45,13 @@ from chi2s import *
 from levmar import *
 from lhapdf_funs import *
 from error_calc import *
+
+if DEBUG:
+# # Fake LHAPDF folder, no longer needed
+    TEMP_LHAPDF = pathlib.Path("tmp_lhapdf")
+    TEMP_LHAPDF.mkdir(exist_ok=True)
+    lhapdf.pathsAppend(TEMP_LHAPDF.as_posix())
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--config", required=True, type=str, help="Path to the config file")
@@ -256,7 +257,8 @@ if fit_pars.theoryidi==212:
     fit_pars.imaxdat=len(fit_pars.dataset_40) 
 
 pdf_pars.lhapdfdir = get_lha_datapath() + "/"
-# pdf_pars.tmp_lhapdfdir = TEMP_LHAPDF
+if DEBUG:
+    pdf_pars.tmp_lhapdfdir = TEMP_LHAPDF
 profile=_get_nnpdf_profile(None)
 fit_pars.datapath=pathlib.Path(profile["data_path"])
 # fit_pars.theories_path=pathlib.Path(profile["theories_path"])

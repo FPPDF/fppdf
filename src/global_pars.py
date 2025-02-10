@@ -1,6 +1,8 @@
 import numpy as np
 from validphys.loader import Loader
 
+DEBUG = False
+
 class load_nnpdf:
     l=Loader()
 
