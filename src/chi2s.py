@@ -157,13 +157,15 @@ def chi2min_fun(afree,jac_calc,hess_calc):
                 if DEBUG:
                     initlha(name,pdf_pars.lhapdfdir)
                     writelha(name,pdf_pars.lhapdfdir,parin1)
-                
-                if fit_pars.newmin and chi2_pars.ipdf_newmin > 0:
-                    pdf_function = "diff"
+                    vp_pdf = None
                 else:
-                    pdf_function = "msht"
+                
+                    if fit_pars.newmin and chi2_pars.ipdf_newmin > 0:
+                        pdf_function = "diff"
+                    else:
+                        pdf_function = "msht"
 
-                vp_pdf = MSHTPDF(name = name, pdf_parameters = parin1, pdf_function = pdf_function)
+                    vp_pdf = MSHTPDF(name = name, pdf_parameters = parin1, pdf_function = pdf_function)
 
                 pdf_pars.PDFlabel=name
                 pdf_pars.parin_newmin_reset=True
