@@ -1888,7 +1888,7 @@ def jaccalc_newmin(label_arr,label_arrm,eps_arr,hess_calc, vp_pdf=None):
 
     pdf_pars.PDFlabel=label_arr[0].strip()
     pdf_pars.iPDF=0
-    (chiarr[0],theory0,cov0,cov0in,diffs0)=chi2corr(fit_pars.imindat,imax-1)
+    (chiarr[0],theory0,cov0,cov0in,diffs0)=chi2corr(fit_pars.imindat,imax-1,vp_pdf)
     
     tarr=[theory0]
     covarr=[cov0]
@@ -1902,7 +1902,7 @@ def jaccalc_newmin(label_arr,label_arrm,eps_arr,hess_calc, vp_pdf=None):
         # print(ip)
         pdf_pars.iPDF=ip
         pdf_pars.PDFlabel=label_arr[ip].strip()
-        (chiarr[ip],theory,cov,covin,diffs_out)=chi2corr(fit_pars.imindat,imax-1)
+        (chiarr[ip],theory,cov,covin,diffs_out)=chi2corr(fit_pars.imindat,imax-1,vp_pdf)
         tarr.append(theory)
         diffsarr.append(diffs_out)
         if(chi2_pars.uset0cov):
@@ -2013,7 +2013,7 @@ def jaccalc(label_arr,label_arrm,eps_arr,hess_calc, vp_pdf=None):
 
     pdf_pars.PDFlabel=label_arr[0].strip()
     pdf_pars.iPDF=0
-    (chiarr[0],theory0,cov0,cov0in,diffs_out)=chi2corr(fit_pars.imindat,imax-1)
+    (chiarr[0],theory0,cov0,cov0in,diffs_out)=chi2corr(fit_pars.imindat,imax-1,vp_pdf)
     
     tarr=[theory0]
     covarr=[cov0]
@@ -2026,7 +2026,7 @@ def jaccalc(label_arr,label_arrm,eps_arr,hess_calc, vp_pdf=None):
         # print(ip)
         pdf_pars.iPDF=ip
         pdf_pars.PDFlabel=label_arr[ip].strip()
-        (chiarr[ip],theory,cov,covin,diffs_out)=chi2corr(fit_pars.imindat,imax-1)
+        (chiarr[ip],theory,cov,covin,diffs_out)=chi2corr(fit_pars.imindat,imax-1,vp_pdf)
         tarr.append(theory)
         if(chi2_pars.uset0cov):
             covarr.append(cov)
