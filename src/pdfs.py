@@ -852,6 +852,8 @@ def int_g2_msht(ain,xmin):
 
 
 def sumrules(parin):
+    """
+    Modify the set of input parameters so that the sum rules are fulfilled"""
     
     out=parin.copy()
 
@@ -931,7 +933,7 @@ def sumrules(parin):
     return out
 
 def initpars():
-
+    """Prepare the whole set of initial parameters"""
     auv=uv_init()
     adv=dv_init()
     asea=sea_init()
@@ -940,7 +942,6 @@ def initpars():
     asm=smin_init()
     adbub=dbub_init()
     fitcharm=fitcharm_init()
-
 
     # pdfpars=np.concatenate((auv,adv,asea,asp,ag,asm,adbub))  
     pdfpars=np.concatenate((auv,adv,asea,asp,ag,asm,adbub,fitcharm))  
@@ -1008,19 +1009,20 @@ def dbub_init():
     
     return a
 
-def parset(af,parin):
+def parset(af, parin, are_free=None):
+    """
+        Takes an array of free parameters (``af``)
+        and an array with all parameters in the problem (``parin``).
+        Returns an array where the free parameters of ``parin`` are substituted with those in ``af``.
+        Whether the parameters are to be considered free or not is given by the ``are_free`` array.
 
-    afi=af.copy()
-    out=parin.copy()
+        Note: the parameters in ``af`` should be order like in ``parin``.
+    """
+    if are_free is None:
+        are_free = pdf_pars.par_isf
 
-
-    for i in range(1,basis_pars.n_pars):
-        if pdf_pars.par_isf[i]:
-            out[i]=afi[0]
-            afi=np.delete(afi,0)
-    
-
-
+    out = parin.copy()
+    out[are_free.astype(bool)] = af
     return out
 
 def parcheck(pars):

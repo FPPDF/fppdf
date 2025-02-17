@@ -1,11 +1,11 @@
-import warnings as wa                                                                                  
+import warnings as wa
 from validphys import core
 from validphys.api import API
 from validphys.fkparser import load_fktable
 from validphys.loader import Loader
 from validphys.convolution import predictions, linear_predictions, central_predictions
 import validphys.convolution as conv
-# from validphys.results import experiments_index                                                               
+# from validphys.results import experiments_index
 import validphys.results as rs
 from validphys.covmats import covmat_from_systematics
 import numpy as np
@@ -179,7 +179,7 @@ if fit_pars.pos_nogluon:
 if fit_pars.pos_gluononly:
     fit_pars.pos_data31=fit_pars.pos_data31_gluononly
     fit_pars.pos_data40=fit_pars.pos_data40_gluononly
-    
+
 if fit_pars.pos_dyc:
     fit_pars.pos_40=False
     fit_pars.pos_data31=fit_pars.pos_data31_dyc
@@ -229,17 +229,17 @@ elif fit_pars.dset_type == 'lowenergyDY':
         fit_pars.cftrue[i]=True
 elif fit_pars.dset_type == 'lowenergyDISDY':
     fit_pars.dataset_40=fit_pars.dataset_lowenergyDISDY
-    fit_pars.imaxdat=len(fit_pars.dataset_40)   
+    fit_pars.imaxdat=len(fit_pars.dataset_40)
     for i in range(10,19):
         fit_pars.cftrue[i]=True
 elif fit_pars.dset_type == 'lowenergyDISDY_HERAonly':
     fit_pars.dataset_40=fit_pars.dataset_lowenergyDISDY_HERAonly
-    fit_pars.imaxdat=len(fit_pars.dataset_40)   
+    fit_pars.imaxdat=len(fit_pars.dataset_40)
 elif fit_pars.dset_type == 'test':
     fit_pars.dataset_40=fit_pars.dataset_test
     fit_pars.imaxdat=len(fit_pars.dataset_40)
     for i in range(0,fit_pars.imaxdat):
-        fit_pars.cftrue[i]=False 
+        fit_pars.cftrue[i]=False
 elif fit_pars.dset_type == 'global_new':
     fit_pars.dataset_40=fit_pars.dataset_40_new
     fit_pars.imaxdat=len(fit_pars.dataset_40)
@@ -253,7 +253,7 @@ if inout_pars.pd_output:
 
 if fit_pars.theoryidi==212:
     fit_pars.dataset_40=fit_pars.dataset_40_nlo
-    fit_pars.imaxdat=len(fit_pars.dataset_40) 
+    fit_pars.imaxdat=len(fit_pars.dataset_40)
 
 pdf_pars.lhapdfdir = get_lha_datapath() + "/"
 if DEBUG:
@@ -265,7 +265,7 @@ fit_pars.datapath=pathlib.Path(profile["data_path"])
 fit_pars.newmin=True
 
 if chi2_pars.diff_4:
-    chi2_pars.diff_2=True 
+    chi2_pars.diff_2=True
 
 if not pdf_pars.uselha:
     pdf_pars.lhin=False
@@ -287,7 +287,7 @@ if inout_pars.readcov:
     # fit_pars.pos_const=False
     if fit_pars.nnpdf_pos:
         fit_pars.pos_const=True
-    else:  
+    else:
         fit_pars.pos_const=False
     (afi,hess,jac)=readincov()
     if chi2_pars.dynamic_tol:
@@ -311,28 +311,42 @@ print(tzero)
 
 use_levmar=True
 
+# Prepare the initial PDF that might be used for the computation
+# of the chi2, the minimization, etc.
+if pdf_pars.lhin:
+    # If using directly an LHAPDF input, load said PDF
+    vp_pdf = API.pdf(pdf = pdf_pars.PDFlabel_lhin)
+else:
+    # NB the name is irrelevant since the PDF object doesn't leave the program
+    pdfname = f"{inout_pars.label}_run+{pdf_pars.idir}"
+
+    # Take the free parameters and create the parameter set
+    parin = initpars()
+    pdf_parameters_raw = parset(afi, parin, are_free = pdf_pars.par_isf)
+    # Modify it so the sumrules work (is this independent from the parametrization or need the function below?)
+    pdf_parameters = sumrules(pdf_parameters_raw)
+
+    vp_pdf = MSHTPDF(name = pdfname, pdf_parameters = pdf_parameters, pdf_function = "msht")
+
+
+
 if inout_pars.readcov:
 
     print('finish!')
 
-elif len(afi)==0:  # no free pars                                                                              \
-                                                                                                                
+elif len(afi)==0:  # no free pars
 
     if inout_pars.pdout:
 
         print('Output PD to file...')
-
         chi2_pars.t0=False
         fit_pars.pos_const=False
-        chi2expi=chi2min(afi)
+        chi2expi=chi2min(afi, vp_pdf=vp_pdf)
 
     elif(chi2_pars.chi2ind):
-
         chi2_pars.t0=True
         fit_pars.pos_const=False
-        chi2t0i=chi2min(afi)
-        
-    
+        chi2t0i=chi2min(afi, vp_pdf=vp_pdf)
 
         print('chi2(t0) in (no pos pen):',chi2t0i,chi2t0i/chi2_pars.ndat)
         t1=time.process_time()
@@ -341,17 +355,17 @@ elif len(afi)==0:  # no free pars                                               
 
         chi2_pars.t0=False
         fit_pars.pos_const=False
-        chi2expi=chi2min(afi)
+        chi2expi=chi2min(afi, vp_pdf=vp_pdf)
         chi2_pars.t0=True
-        chi2t0i=chi2min(afi)
+        chi2t0i=chi2min(afi, vp_pdf=vp_pdf)
         fit_pars.pos_const=True
 
 
         if(inout_pars.pdin):
-            
-            chi2posi=chi2min(afi)
+
+            chi2posi=chi2min(afi, vp_pdf=vp_pdf)
             pospeni=chi2posi-chi2t0i
-            
+
             # print('chi2(exp) in:',chi2expi,(chi2expi)/chi2_pars.ndat)
             # t1=time.process_time()
             # print('time= ',t1-tzero)
@@ -373,8 +387,8 @@ elif len(afi)==0:  # no free pars                                               
 
         else:
             fit_pars.pos_const=True
-            
-            chi2posi=chi2min(afi)
+
+            chi2posi=chi2min(afi, vp_pdf=vp_pdf)
             pospeni=chi2posi-chi2t0i
 
             print('chi2(exp) in:',chi2expi+pospeni,(chi2expi+pospeni)/chi2_pars.ndat)
@@ -410,22 +424,35 @@ elif(use_levmar):
         print('afo = ', afo)
 
     else:
-        chi2_pars.t0=False                                                                       
-        fit_pars.pos_const=False                                                                        
-        chi2expi=chi2min(afi)                                                
-        chi2_pars.t0=True                                                     
-        chi2t0i=chi2min(afi)                                                
-        fit_pars.pos_const=True                                                                             
-        chi2posi=chi2min(afi)                                                                                      
-        pospeni=chi2posi-chi2t0i                                                                                   
-        print('chi2(exp) in:',chi2expi+pospeni,(chi2expi+pospeni)/chi2_pars.ndat)                                            
-        print('chi2(t0) in:',(chi2t0i+pospeni),(chi2t0i+pospeni)/chi2_pars.ndat)                                             
-        print('pos penalty in = ',pospeni,pospeni/chi2_pars.ndat)          
-        
+        # Compute the experimental chi2
+        chi2_pars.t0=False
+        fit_pars.pos_const=False
+        chi2expi=chi2min(afi, vp_pdf = vp_pdf)
+
+        # Now the t0 chi2
+        chi2_pars.t0=True
+        chi2t0i=chi2min(afi, vp_pdf = vp_pdf)
+
+        # And now the positivity
+        fit_pars.pos_const=True
+        chi2posi=chi2min(afi, vp_pdf = vp_pdf)
+
+        # TODO: these three calls should have t0/pos as input parameter to the chi2 function
+        # and possibily also the PDF *object* should be an input
+        pospeni=chi2posi-chi2t0i
+
+        # Now compute the loss functions (ie., chi2+positivity)
+        loss_exp = chi2expi+pospeni
+        loss_t0 = chi2posi
+        ndat = chi2_pars.ndat
+        print(f"chi2(exp) in:{loss_exp:.8} {loss_exp/ndat:.5}")
+        print(f"chi2(t0) in:{loss_t0:.8} {loss_t0/ndat:.5}")
+        print(f"chi2(exp) in:{pospeni:.5}")
+
         chi2_pars.t0=True
         if fit_pars.nnpdf_pos:
             fit_pars.pos_const=True
-        else:  
+        else:
             fit_pars.pos_const=False
 
         chi2_pars.diff_4=False
@@ -433,7 +460,7 @@ elif(use_levmar):
         # chi2_pars.t0=False
         # chi2_pars.diff_2=False
         # afo=levmar(afi)
-        # print('afo = ', afo)  
+        # print('afo = ', afo)
 
         chi2_pars.t0=False
         dload_pars.dflag=1
@@ -483,7 +510,7 @@ elif(use_levmar):
                 outputfile.write("\n")
                 afo=levmar(afo)
         else:
-            
+
             # chi2_pars.diff_2=True
 
             if(inout_pars.pdin):
@@ -495,12 +522,12 @@ elif(use_levmar):
                 chi2_pars.t0=False
                 chi2_pars.t0_noderiv=False
 
-             
+
             chi2_pars.t0=False
             chi2_pars.t0_noderiv=False
             # chi2_pars.diff_2=True
 
-
+            # TODO this should open a context manager and pass down the file already opened
             outputfile=open('outputs/buffer/'+inout_pars.label+'.dat','a')
             outputfile.write("diff2=False")
             print("diff2=False")
@@ -515,7 +542,7 @@ elif(use_levmar):
                 chi2_pars.t0=False
                 chi2_pars.t0_noderiv=False
 
-        print('afo = ', afo)                                                                                     
+        print('afo = ', afo)
 
     if(pdf_closure.pdpdf):
 
@@ -541,7 +568,7 @@ elif(use_levmar):
         fit_pars.pos_const=True
         chi2posf=chi2min(afo)
         pospenf=chi2posf-chi2expf
-        
+
         print('chi2(exp) in:',chi2expi+pospeni,(chi2expi+pospeni)/chi2_pars.ndat)
         print('chi2(t0) in:',(chi2t0i+pospeni),(chi2t0i+pospeni)/chi2_pars.ndat)
         print('pos penalty in = ',pospeni,pospeni/chi2_pars.ndat)
@@ -562,7 +589,7 @@ else:
     chi2expi=chi2min(afi)
     chi2_pars.t0=True
     chi2t0i=chi2min(afi)
-    ##    fit_pars.pos_const=True                                                                                        
+    ##    fit_pars.pos_const=True
     fit_pars.pos_const=True
     chi2posi=chi2min(afi)
     pospeni=chi2posi-chi2t0i
@@ -570,8 +597,8 @@ else:
     print('chi2(t0) in:',chi2t0i,chi2t0i/chi2_pars.ndat)
     print('pos penalty = ',pospeni)
     res = minimize(chi2min, afi, method='Nelder-Mead', tol=1e-4, options = {'maxiter': 10000, 'maxfev': 10000})
-    # res = minimize(chi2min, afi, method='Newton-CG', jac=jac_fun, hess=hess_fun, options = {'disp': True})    
-#    res = minimize(chi2min, afi, method='CG', jac=jac_fun, options = {'maxiter': 10000})                       
+    # res = minimize(chi2min, afi, method='Newton-CG', jac=jac_fun, hess=hess_fun, options = {'disp': True})
+#    res = minimize(chi2min, afi, method='CG', jac=jac_fun, options = {'maxiter': 10000})
     print('pars out =',res.x)
     print(chi2min(res.x),chi2min(res.x)/chi2_pars.ndat)
     gridout()

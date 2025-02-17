@@ -76,11 +76,14 @@ def af_matcalc(afree):
 
     return afree_mat
 
-def chi2min_fun(afree,jac_calc,hess_calc):
+def chi2min_fun(afree,jac_calc = False, hess_calc = False, vp_pdf=None):
+    """
+        Compute the chi2 for vp_pdf for the parameters arfree.
+        If jac_calc is True <to be completed>
+    """
 
 
     err=False
-    vp_pdf = None
     
     parin=initpars()
 
@@ -224,47 +227,37 @@ def chi2min_fun(afree,jac_calc,hess_calc):
                 pdf_pars.idir+=pdf_pars.npar_free
         
     else:
+        if DEBUG:
+            # TODO: to be removed 
+            # when computing the chi2 no need to do anything with the PDF
 
-        name=inout_pars.label+'_run'+str(pdf_pars.idir) 
-        # name=inout_pars.label+'_irep'+str(fit_pars.irep)+'_run'+str(pdf_pars.idir)
+            name=inout_pars.label+'_run'+str(pdf_pars.idir) 
+            parin1=pdf_pars.pdfparsi.copy() 
 
+            pdf_pars.parinarr[0,:]=parin1
+            pdf_pars.iPDF=0
 
-        parin1=pdf_pars.pdfparsi.copy() 
+            # write to temp lhapdf grid to be used by nnpdf code
+            if(pdf_pars.uselha):
+                # TODO: this might not be needed at all
+                # in any case here writelha uses always msht
+                chi2_pars.ipdf_newmin=0
 
-        pdf_pars.parinarr[0,:]=parin1
-        pdf_pars.iPDF=0
-
-        # write to temp lhapdf grid to be used by nnpdf code
-        if(pdf_pars.uselha):
-            # TODO: this might not be needed at all
-            # in any case here writelha uses always msht
-            chi2_pars.ipdf_newmin=0
-
-            if DEBUG:
                 initlha(name, pdf_pars.tmp_lhapdfdir)
                 pdf_pars.PDFlabel=name
                 writelha(name,pdf_pars.tmp_lhapdfdir,parin1)
 
-            if pdf_pars.lhin:
-                # If using directly an LHAPDF input, load said PDF
-                vp_pdf = API.pdf(pdf = pdf_pars.PDFlabel_lhin)
-            else:
-                vp_pdf = MSHTPDF(name = name, pdf_parameters = parin1, pdf_function = "msht")
-
-            pdf_pars.vp_pdf = vp_pdf
-
-        # TODO calculate chi2
         print("> Calculating chi2 <")
         chi=chi2totcalc(vp_pdf=vp_pdf)
         out=chi[0]+chi[1] # exp + positivity
         out0=chi[0]
         pdf_pars.idir+=1 # iterate up so new folder
 
-        print('chi2/N_dat=',out/chi2_pars.ndat)                                                                                             
-        print('chi2tot (no pos)=',out0)                                                                                       
-        print('pos pen =',chi[1])
-        print('chi2tot (no pos)/N_dat=',out0/chi2_pars.ndat)  
-        
+        ndat = chi2_pars.ndat
+        print(f"chi2/N_dat={out/ndat:.5}")
+        print(f"chi2tot (no pos)={out0:.5}")
+        print(f"pos pen ={chi[1]:.5}")
+        print(f"chi2tot (no pos)/N_dat={out0/ndat:.5}")  
 
     # if jac_calc and hess_calc:
     #     print('testing...')
@@ -1213,10 +1206,14 @@ def jac_fun(afree):
     print('Jacobian = ',out)
     return out
 
-def chi2min(afree):
+def chi2min(afree = None, vp_pdf=None):
+    """Compute the chi2 that will be used during the minimization
+    But disable the computation of the hessian and jacobian.
+    Takes as input the free parameters of the problem.
+    """
     hess_calc=False
     jac_calc=False
-    outarr=chi2min_fun(afree,jac_calc,hess_calc)
+    outarr=chi2min_fun(afree,jac_calc,hess_calc, vp_pdf=vp_pdf)
     out=outarr[0]
     return out
     
@@ -1881,6 +1878,7 @@ def jaccalc_newmin(label_arr,label_arrm,eps_arr,hess_calc, vp_pdf=None):
     jacarr=np.zeros((pdf_pars.npar_free+1))
     hessarr=np.zeros((pdf_pars.npar_free+1,pdf_pars.npar_free+1))
 
+    # TODO This writes (upon first call) the <run3>
     pdf_pars.PDFlabel=label_arr[0].strip()
     pdf_pars.iPDF=0
     (chiarr[0],theory0,cov0,cov0in,diffs0)=chi2corr(fit_pars.imindat,imax-1,vp_pdf)
@@ -1998,7 +1996,6 @@ def jaccalc(label_arr,label_arrm,eps_arr,hess_calc, vp_pdf=None):
     # TODO
 
     print('JACCALC OLDMIN')
-    import ipdb; ipdb.set_trace()
 
     imax=fit_pars.imaxdat
 

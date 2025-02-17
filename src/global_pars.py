@@ -1,7 +1,7 @@
 import numpy as np
 from validphys.loader import Loader
 
-DEBUG = True
+DEBUG = False
 # TODO: The newmin parameter should always be true
 
 class load_nnpdf:

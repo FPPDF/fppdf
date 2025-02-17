@@ -55,14 +55,17 @@ def readincov():
     return (afin,hess,jac)
 
 def readin():
+    """Read the input file inputs::input_file
+
+    Uses ``np.loadtxt`` to read the file a few times once per flavour.
+    These parameters are the initial parameters of the fit.
+    For each set of parameters, the first column represents the parameter value
+    and the second whether it is a free parameter (1) or whether it should be considered fixed (0)
+    """
 
     parfree_def=False
 
     inputfile='input/'+inout_pars.inputnam
-
-    with open(inputfile, 'r') as fp:
-        x = fp.readlines()
-        num_lines = len([l for l in x if l.strip(' \n') != ''])
 
     # distuv=np.loadtxt(inputfile,skiprows=1,max_rows=8)
     nuv=basis_pars.i_uv_max-basis_pars.i_uv_min-1

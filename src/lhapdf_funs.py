@@ -109,8 +109,6 @@ def writelha(name,lhdir,parin):
         for ix in range(0,nx):
             for iq in range(0,2):
                 xin=xarr[ix]
-
-
                 if fit_pars.theoryidi==211 or fit_pars.theoryidi==40001000 or fit_pars.theoryidi==50001000:
                     qin=1.00
                 elif fit_pars.theoryidi==200:
