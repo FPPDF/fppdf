@@ -205,6 +205,8 @@ def _predictions_2pdfs_new(dataset, fkfunc, pdf1, pdf2=None):
     all replicas, central, etc) according to the provided ``fkfunc``, which
     should have the same interface as e.g. ``fk_predictions``.
     """
+    if not DEBUG:
+        print("We should not be entering here! Who's calling me?")
     
     opfunc = OP[dataset.op]
     if dataset.cuts is None:

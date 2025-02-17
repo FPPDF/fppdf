@@ -150,9 +150,8 @@ fit_pars.nlo_cuts=fitp.get("nlo_cuts")
 if fit_pars.nlo_cuts is None:
     fit_pars.nlo_cuts=False
 
-fit_pars.newmin=fitp.get("newmin")
-if fit_pars.newmin is None:
-    fit_pars.newmin=True
+# Make sure that new_min is True
+fit_pars.newmin=True
 
 fit_pars.dynT_group=fitp.get("dynT_group")
 if fit_pars.dynT_group is None:
@@ -515,31 +514,6 @@ elif(use_levmar):
             if inout_pars.pd_output:
                 chi2_pars.t0=False
                 chi2_pars.t0_noderiv=False
-
-            # chi2_pars.t0_noderiv=False
-            # chi2_pars.t0=True
-            
-            if not fit_pars.newmin:
-                chi2_pars.diff_2=True
-                outputfile=open('outputs/buffer/'+inout_pars.label+'.dat','a')
-                print('t0=True,diff2=True')
-                outputfile.write("t0=True,diff2=True")
-                outputfile.write(inout_pars.inputnam)
-                outputfile.write("\n")
-                afo=levmar(afo)
-            
-
-            # chi2_pars.diff_2=True
-            # outputfile.write("lampos = 1e3, t0,d2=true")
-            # outputfile.write(inout_pars.inputnam)
-            # outputfile.write("\n")
-            # afo=levmar(afo)
-
-        # else:
-        #     afo=levmar(afi)
-
-        #    diff_2=True                                                                                                
-        #    afo=levmar_meth3(afi)                                                                                      
 
         print('afo = ', afo)                                                                                     
 

@@ -1,4 +1,5 @@
 from global_pars import *
+import functools
 from validphys.api import API
 import scipy.linalg as la
 from data_theory import *
@@ -140,11 +141,8 @@ def chi2min_fun(afree,jac_calc,hess_calc):
                 pdf_pars.PDFlabel_cent=name
             else:
                 parin=pdf_pars.pdfparsi.copy() 
-                if fit_pars.newmin:
-                    (parin1,eps_arr[ip])=parinc(parin,ip-1,1)
-                    chi2_pars.eps_arr_newmin[ip]=eps_arr[ip]
-                else:   
-                    (parin1,eps_arr[ip])=parinc(parin,ip-1,1)
+                (parin1,eps_arr[ip])=parinc(parin,ip-1,1)
+                chi2_pars.eps_arr_newmin[ip]=eps_arr[ip]
                 pdf_pars.parinarr[ip,:]=parin1
 
                 if fit_pars.deld_const:
@@ -157,13 +155,12 @@ def chi2min_fun(afree,jac_calc,hess_calc):
                 if DEBUG:
                     initlha(name,pdf_pars.lhapdfdir)
                     writelha(name,pdf_pars.lhapdfdir,parin1)
-                    vp_pdf = None
-                else:
                 
-                    if fit_pars.newmin and chi2_pars.ipdf_newmin > 0:
-                        pdf_function = "diff"
-                    else:
-                        pdf_function = "msht"
+                if ip > 0: 
+                    # internally writelha was using chi2_pars.ipdf_newmin
+                    pdf_function = "diff"
+                else:
+                    pdf_function = "msht"
 
                     vp_pdf = MSHTPDF(name = name, pdf_parameters = parin1, pdf_function = pdf_function)
 
@@ -205,10 +202,7 @@ def chi2min_fun(afree,jac_calc,hess_calc):
 
         else:
             print('JACCALC')
-            if fit_pars.newmin:
-                (jac,hess,out0,out1,hessp)=jaccalc_newmin(pdflabel_arr,pdflabel_marr,eps_arr,hess_calc, vp_pdf=vp_pdf)
-            else:
-                (jac,hess,out0,out1,hessp)=jaccalc(pdflabel_arr,pdflabel_marr,eps_arr,hess_calc, vp_pdf=vp_pdf)
+            (jac,hess,out0,out1,hessp)=jaccalc_newmin(pdflabel_arr,pdflabel_marr,eps_arr,hess_calc, vp_pdf=vp_pdf)
             out=out0+out1
             
 
@@ -242,23 +236,20 @@ def chi2min_fun(afree,jac_calc,hess_calc):
 
         # write to temp lhapdf grid to be used by nnpdf code
         if(pdf_pars.uselha):
+            # TODO: this might not be needed at all
+            # in any case here writelha uses always msht
+            chi2_pars.ipdf_newmin=0
+
             if DEBUG:
                 initlha(name, pdf_pars.tmp_lhapdfdir)
                 pdf_pars.PDFlabel=name
                 writelha(name,pdf_pars.tmp_lhapdfdir,parin1)
 
-            chi2_pars.ipdf_newmin=0
-
             if pdf_pars.lhin:
                 # If using directly an LHAPDF input, load said PDF
                 vp_pdf = API.pdf(pdf = pdf_pars.PDFlabel_lhin)
             else:
-                # TODO only these two options? Does it make sense to have this if here?
-                if fit_pars.newmin and chi2_pars.ipdf_newmin > 0:
-                    pdf_function = "diff"
-                else:
-                    pdf_function = "msht"
-                vp_pdf = MSHTPDF(name = name, pdf_parameters = parin1, pdf_function = pdf_function)
+                vp_pdf = MSHTPDF(name = name, pdf_parameters = parin1, pdf_function = "msht")
 
             pdf_pars.vp_pdf = vp_pdf
 
@@ -1879,6 +1870,8 @@ def jaccalc_d0(label_arr,eps_arr,il,ih):
     return jacarr
 
 def jaccalc_newmin(label_arr,label_arrm,eps_arr,hess_calc, vp_pdf=None):
+
+    vp_pdf = None
 
     print('JACCALC NEWMIN')
 

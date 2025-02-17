@@ -1,7 +1,8 @@
 import numpy as np
 from validphys.loader import Loader
 
-DEBUG = False
+DEBUG = True
+# TODO: The newmin parameter should always be true
 
 class load_nnpdf:
     l=Loader()
@@ -1002,7 +1003,7 @@ class fit_pars:
     preds_stored={}
     datapath=''
     theories_path=''
-    newmin=False
+    newmin=True # This should always be set to True
     dataset_ii_global=''
     pdf_dict=[]
 
