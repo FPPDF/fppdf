@@ -109,6 +109,7 @@ def writelha(name,lhdir,parin):
         for ix in range(0,nx):
             for iq in range(0,2):
                 xin=xarr[ix]
+                # TODO: ask vp which is the starting scale for whatever theory is being used
                 if fit_pars.theoryidi==211 or fit_pars.theoryidi==40001000 or fit_pars.theoryidi==50001000:
                     qin=1.00
                 elif fit_pars.theoryidi==200:
@@ -122,7 +123,7 @@ def writelha(name,lhdir,parin):
                         pdfout=pdfs[fit_pars.lhrep].xfxQ(i,xin,qin)
                     else:
                         if iq==0:
-                            if fit_pars.newmin and chi2_pars.ipdf_newmin > 0:
+                            if chi2_pars.ipdf_newmin > 0:
                                 pdfout=pdfs_diff(i,xin)
                             else:
                                 pdfout=pdfs_msht(i,parin,xin)
@@ -136,7 +137,7 @@ def writelha(name,lhdir,parin):
                         # pdfout=pdfs[0].xfxQ(i,xin,qin)
                     else:
                         if iq==0:
-                            if fit_pars.newmin and chi2_pars.ipdf_newmin > 0:
+                            if chi2_pars.ipdf_newmin > 0:
                                 pdfout=pdfs_diff(i,xin)
                             else:
                                 pdfout=pdfs_msht(i,parin,xin)
@@ -148,7 +149,7 @@ def writelha(name,lhdir,parin):
                     pdfout=pdfs[fit_pars.lhrep].xfxQ(21,xin,qin)
                 else:
                     if iq==0:
-                        if fit_pars.newmin and chi2_pars.ipdf_newmin > 0:
+                        if chi2_pars.ipdf_newmin > 0:
                             pdfout=pdfs_diff(0,xin)
                         else:
                             pdfout=pdfs_msht(0,parin,xin)
@@ -156,7 +157,6 @@ def writelha(name,lhdir,parin):
                         pdfout=1.
                 pdfarr[5]=pdfout
             
-#                np.savetxt(outputfile,pdfarr,fmt="%.7E",delimiter=' ', newline=' ')
                 np.savetxt(outputfile,pdfarr,fmt="%.14E",delimiter=' ', newline=' ')
                 outputfile.write('\n')
 

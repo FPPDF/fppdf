@@ -377,6 +377,7 @@ def levmar(afree):
         jac_calc=True
         
         dload_pars.dcov=1
+
     
         (chi2i,jaci,hessi,err,hessp)=chi2min_fun(af,jac_calc,hess_calc)
 

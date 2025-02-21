@@ -1,3 +1,4 @@
+import functools
 from global_pars import *
 from chebyshevs import *
 from copy import deepcopy
@@ -8,13 +9,33 @@ from scipy.misc import derivative as deriv
 from validphys.core import PDF
 from validphys.lhapdfset import LHAPDFSet
 
+def _derivative(func, fl, parameters, x, eps):
+    """The scipy.misc.derivative function is deprecated and won't exist in newer versions
+    of scipy.
+    This implements the same derivative for order 5, evaluated at 0
+    already specialized for the PDF functions which take only the variation as input
+    From: https://github.com/scipy/scipy/blob/92d2a8592782ee19a1161d0bf3fc2241ba78bb63/scipy/_lib/_finite_differences.py#L69
+    """
+    # TODO: we can probably have the exact derivative and that's it?
+    weights = np.array([1, -8, 8, -1]) / 12.0
+    funvals = np.array([func(fl, p, x) for p in parameters])
+    return np.sum(funvals * weights) / np.sum(eps)
+
 
 class MSHTSet(LHAPDFSet):
     """Provides a few lhapdf-like functions to trick vp into thinking it is an LHAPDFset
     Can work with any function with a signature of (flavour, parameters, x)
     """
 
-    def __init__(self, pdf_function, parameters, name, error_type="replicas"):
+    def __init__(
+        self,
+        pdf_function,
+        parameters,
+        name,
+        error_type="replicas",
+        variation=None,
+        theta_idx=None,
+    ):
         self._error_type = error_type
         self._name = name
         self._flavors = None
@@ -22,6 +43,22 @@ class MSHTSet(LHAPDFSet):
 
         self._parameters = parameters
         self._pdf_function = pdf_function
+        self._derivatives = []
+        self._variation = variation
+
+        if variation is not None:
+            # Compute the 4 variations needed for the derivative
+            for k in [-2, -1, 1, 2]:
+                self._derivatives.append(
+                    parinc_newmin(
+                        self._parameters, theta_idx, k * variation, true_idx=True
+                    )[0]
+                )
+
+    @functools.cached_property
+    def is_derivative(self):
+        """Whether this is a PDF of its derivative"""
+        return self._variation is not None
 
     def xfxQ(self, x, Q, n, fl):
         """Return the PDF value for one single point for one single member
@@ -29,7 +66,12 @@ class MSHTSet(LHAPDFSet):
         """
         if fl == 21:
             fl = 0
-        return self._pdf_function(fl, self._parameters, x)
+        if self.is_derivative:
+            return _derivative(
+                self._pdf_function, fl, self._derivatives, x, self._variation
+            )
+        else:
+            return self._pdf_function(fl, self._parameters, x)
 
     def grid_values(self, flavors: np.ndarray, xgrid: np.ndarray, qgrid: np.ndarray):
         """Returns the PDF values for every member for the required flavors, x, q
@@ -58,21 +100,44 @@ class MSHTPDF(PDF):
         boundary=None,
         pdf_function="msht",
         pdf_parameters=None,
+        variation=None,
+        theta_idx=None,
         Q=1.0,
     ):
         if isinstance(pdf_function, str):
-            if pdf_function == "msht":
-                pdf_function = pdfs_msht
-            elif pdf_function == "diff":
-                pdf_function = pdfs_diff
-            else:
+            if pdf_function != "msht":
                 raise NotImplementedError(f"{pdf_function=}")
+            pdf_function = pdfs_msht
 
-        self._lhapdf_set = MSHTSet(pdf_function, pdf_parameters, name)
+        self._pdf_function = pdf_function
+        self._pdf_parameters = pdf_parameters
+        self._variation = variation
+        self._theta_idx = theta_idx
         super().__init__(name, None)
 
         # Create some fake info:
         self._info = {"NumMembers": 1}
+
+    @functools.cached_property
+    def _lhapdf_set(self):
+        return MSHTSet(
+            self._pdf_function,
+            self._pdf_parameters,
+            self.name,
+            variation=self._variation,
+            theta_idx=self._theta_idx
+        )
+
+    def make_derivative(self, idx, eps=1e-5):
+        """Constructs the derivative of the PDF with respect the parameter idx."""
+        variation = np.maximum(1e-12, eps * np.abs(self._pdf_parameters[idx]))
+        return self.__class__(
+            "derivative",
+            pdf_function=self._pdf_function,
+            pdf_parameters=self._pdf_parameters,
+            variation=variation,
+            theta_idx=idx,
+        )
 
     def load(self):
         return self._lhapdf_set
@@ -82,8 +147,7 @@ class MSHTPDF(PDF):
         t0_version._error_type = "t0"
         return t0_version
 
-
-def func_pdfs_diff(eps,ipdf,x,iorder):
+def func_pdfs_diff(eps,ipdf=1,x=0.0,iorder=5):
 
     # print(eps)
 
@@ -103,35 +167,24 @@ def func_pdfs_diff(eps,ipdf,x,iorder):
 
     return out
 
-def pdfs_diff(ipdf, parin=None, x=None):
+def pdfs_diff(ipdf, x=None, parin=None):
     eps=1e-5
     # (pars,eps_out)=parinc_newmin(pdf_pars.parinarr[0,:],chi2_pars.ipdf_newmin-1,eps)
 
-    # TODO
-    # Here we are assuming that we always want to set parinarr[0] == parin
-    # this might not be true in all scenarios.
-    if x is None:
-        # So that the old interface works as well
-        x = parin
-    else:
-        pdf_pars.parinarr[0,:] = parin
     eps=parinc_eps(pdf_pars.parinarr[0,:],chi2_pars.ipdf_newmin-1,eps)
-
-    # # pdfout=pdfs_msht(ipdf,pars,x)-pdfs_msht(ipdf,pdf_pars.parinarr[0,:],x)
-    # pdfout=func_pdfs_diff(eps,ipdf,x)-func_pdfs_diff(0.,ipdf,x)
-    # # pdfout/=chi2_pars.eps_arr_newmin[chi2_pars.ipdf_newmin]
-    # pdfout/=eps
-
-    # derivative(func, x0, dx=1.0
 
     pdf_pars.parin_newmin_counter=0
     iorder=5
     pdfout=deriv(func_pdfs_diff,0.,eps,args=(ipdf,x,iorder),order=iorder)
+
+#     test = functools.partial(func_pdfs_diff, x=x, ipdf=ipdf)
+#     ret = _derivative(test, eps, ipdf, pdf_pars.parinarr[0,:], x)
+
+    mypdf = pdf_pars.derivatives
+    if pdfout > 1e-5 and chi2_pars.ipdf_newmin >0:
+        pass
+
     pdf_pars.parin_newmin_reset=False
-
-
-    # print(pdfout,test)
-    # os.quit()
 
     return pdfout
 
@@ -1160,9 +1213,12 @@ def parinc_eps(parin,ipar,eps):
 
     return eps_n
 
-def parinc_newmin(parin,ipar,eps):
+def parinc_newmin(parin,ipar,eps, true_idx=False):
 
-    npar=pdf_pars.par_free_i[ipar]
+    if true_idx:
+        npar = ipar
+    else:
+        npar=pdf_pars.par_free_i[ipar]
 
     # eps_n=eps*np.abs(parin[npar])
     eps_n=eps

@@ -76,21 +76,15 @@ def af_matcalc(afree):
 
     return afree_mat
 
-def chi2min_fun(afree,jac_calc = False, hess_calc = False, vp_pdf=None):
+def chi2min_fun(afree, jac_calc = False, hess_calc = False, vp_pdf=None):
     """
-        Compute the chi2 for vp_pdf for the parameters arfree.
+        Compute the chi2 for a MSHTPDF for the parameters arfree.
         If jac_calc is True <to be completed>
     """
-
-
     err=False
-    
     parin=initpars()
-
     pdfparsii=parset(afree,parin)
-
     dload_pars.xarr_tot=xgrid_calc()
-
 #    print('pdfparsi = ',pdfparsi)
     
     if not jac_calc and not hess_calc:
@@ -104,6 +98,15 @@ def chi2min_fun(afree,jac_calc = False, hess_calc = False, vp_pdf=None):
 
     pdf_pars.pdfparsi=sumrules(pdfparsii)
 
+    # Reset the vp_pdf if not explicitly given
+    if vp_pdf is None:
+        parin = initpars()
+        pdf_parameters_raw = parset(afree, parin, are_free = pdf_pars.par_isf)
+        pdf_parameters = sumrules(pdf_parameters_raw)
+        vp_pdf = MSHTPDF(name = "pdf", pdf_parameters = pdf_parameters, pdf_function = "msht")
+
+    # TODO Perhaps at this point we want to update the parameters in vp_pdf or to create a new one?
+    # note that upon first call at this point the parameters in pdfparsii are equal to those in the PDF
 
     if fit_pars.deld_const:
         pdf_pars.deld_arr=np.zeros((4*pdf_pars.npar_free+1))
@@ -112,9 +115,6 @@ def chi2min_fun(afree,jac_calc = False, hess_calc = False, vp_pdf=None):
         pdf_pars.delu_arr[0]=pdf_pars.pdfparsi[1]
 
     # print(pdf_pars.pdfparsi[10])
-
-    
-
     jac=np.zeros((pdf_pars.npar_free))
     hess=np.zeros((pdf_pars.npar_free,pdf_pars.npar_free))
     hessp=np.zeros((pdf_pars.npar_free,pdf_pars.npar_free))
@@ -131,8 +131,11 @@ def chi2min_fun(afree,jac_calc = False, hess_calc = False, vp_pdf=None):
 
         eps_arr=np.zeros((pdf_pars.npar_free+1))
         chi2_pars.eps_arr_newmin=eps_arr
-        for ip in range(0,pdf_pars.npar_free+1):
 
+        # TODO
+        # this loop creates the LHAPDF grids for each free parameter
+        pdf_pars.derivatives =[]
+        for ip in range(0,pdf_pars.npar_free+1):
             idir_j=pdf_pars.idir+ip
             name=inout_pars.label+'_run'+str(idir_j)
             # name=inout_pars.label+'_irep'+str(fit_pars.irep)+'_run'+str(idir_j)
@@ -155,20 +158,17 @@ def chi2min_fun(afree,jac_calc = False, hess_calc = False, vp_pdf=None):
             if(pdf_pars.uselha):
                 # TODO what about this
                 chi2_pars.ipdf_newmin=ip
+                if ip > 0:
+                    parameter_index = pdf_pars.par_free_i[ip - 1]
+                    pdf_derivative = vp_pdf.make_derivative(parameter_index)
+                    pdf_pars.derivatives.append(pdf_derivative)
                 if DEBUG:
                     initlha(name,pdf_pars.lhapdfdir)
                     writelha(name,pdf_pars.lhapdfdir,parin1)
                 
-                if ip > 0: 
-                    # internally writelha was using chi2_pars.ipdf_newmin
-                    pdf_function = "diff"
-                else:
-                    pdf_function = "msht"
-
-                    vp_pdf = MSHTPDF(name = name, pdf_parameters = parin1, pdf_function = pdf_function)
-
                 pdf_pars.PDFlabel=name
                 pdf_pars.parin_newmin_reset=True
+        #######################
 
 
         if chi2_pars.diff_2 or fit_pars.pos_const:
@@ -202,7 +202,6 @@ def chi2min_fun(afree,jac_calc = False, hess_calc = False, vp_pdf=None):
             (out0,out1,jac,hessd2)=jaccalc_d2(pdflabel_arr,pdflabel_marr,eps_arr,hess_calc,fit_pars.imindat,fit_pars.imaxdat)
             out=out0+out1
             hess=hessd2.copy()
-
         else:
             print('JACCALC')
             (jac,hess,out0,out1,hessp)=jaccalc_newmin(pdflabel_arr,pdflabel_marr,eps_arr,hess_calc, vp_pdf=vp_pdf)
@@ -1868,8 +1867,6 @@ def jaccalc_d0(label_arr,eps_arr,il,ih):
 
 def jaccalc_newmin(label_arr,label_arrm,eps_arr,hess_calc, vp_pdf=None):
 
-    vp_pdf = None
-
     print('JACCALC NEWMIN')
 
     imax=fit_pars.imaxdat
@@ -1878,7 +1875,6 @@ def jaccalc_newmin(label_arr,label_arrm,eps_arr,hess_calc, vp_pdf=None):
     jacarr=np.zeros((pdf_pars.npar_free+1))
     hessarr=np.zeros((pdf_pars.npar_free+1,pdf_pars.npar_free+1))
 
-    # TODO This writes (upon first call) the <run3>
     pdf_pars.PDFlabel=label_arr[0].strip()
     pdf_pars.iPDF=0
     (chiarr[0],theory0,cov0,cov0in,diffs0)=chi2corr(fit_pars.imindat,imax-1,vp_pdf)
@@ -1895,7 +1891,10 @@ def jaccalc_newmin(label_arr,label_arrm,eps_arr,hess_calc, vp_pdf=None):
         # print(ip)
         pdf_pars.iPDF=ip
         pdf_pars.PDFlabel=label_arr[ip].strip()
-        (chiarr[ip],theory,cov,covin,diffs_out)=chi2corr(fit_pars.imindat,imax-1,vp_pdf)
+
+        parameter_index = pdf_pars.par_free_i[ip - 1]
+        pdf_derivative = vp_pdf.make_derivative(parameter_index)
+        (chiarr[ip],theory,cov,covin,diffs_out)=chi2corr(fit_pars.imindat,imax-1, vp_pdf=pdf_derivative)
         tarr.append(theory)
         diffsarr.append(diffs_out)
         if(chi2_pars.uset0cov):

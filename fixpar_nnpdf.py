@@ -474,6 +474,7 @@ elif(use_levmar):
 
 
         if fit_pars.nnpdf_pos:
+            # TODO: there are a few calls to levmar here that need to be treated
             if(inout_pars.pdin):
                 chi2_pars.t0=False
                 chi2_pars.t0_noderiv=False
@@ -533,7 +534,7 @@ elif(use_levmar):
             print("diff2=False")
             outputfile.write(inout_pars.inputnam)
             outputfile.write("\n")
-            afo=levmar(afi)
+            afo = levmar(afi)
 
             if chi2_pars.t0_noderivin and not inout_pars.pdin:
                 chi2_pars.t0_noderiv=False
