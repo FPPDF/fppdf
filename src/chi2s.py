@@ -128,7 +128,6 @@ def chi2min_fun(afree, jac_calc = False, hess_calc = False, vp_pdf=None):
         pdflabel_p2arr=np.empty(pdf_pars.npar_free+1, dtype='U256')
 
     if(jac_calc):
-
         eps_arr=np.zeros((pdf_pars.npar_free+1))
         chi2_pars.eps_arr_newmin=eps_arr
 
@@ -1479,6 +1478,7 @@ def hess_ij_calc_not0_new(theoryi,theoryj,outi,outj,cov,covin):
     return out
 
 def hess_ij_calc_newmin(diffi,diffj,covin):
+    """Compute off-diagonal entries of the hessian"""
 
     out=diffi@covin@diffj*2.
 
@@ -1612,6 +1612,7 @@ def hess_ii_calc_d2(diff2,cov,covin):
     return out
 
 def hess_ii_calc_newmin(diff2,cov,covin):
+    """Compute diagonal entries of the hessian"""
 
   
 
@@ -1866,6 +1867,9 @@ def jaccalc_d0(label_arr,eps_arr,il,ih):
     return jacarr
 
 def jaccalc_newmin(label_arr,label_arrm,eps_arr,hess_calc, vp_pdf=None):
+    """Compute the derivative of the chi2 wrt the free parameters 
+    (given in Eq.6 https://people.duke.edu/~hpgavin/lm.pdf) and the Hessian 
+    (given after Eq.9 https://people.duke.edu/~hpgavin/lm.pdf)"""
 
     print('JACCALC NEWMIN')
 
@@ -1877,6 +1881,8 @@ def jaccalc_newmin(label_arr,label_arrm,eps_arr,hess_calc, vp_pdf=None):
 
     pdf_pars.PDFlabel=label_arr[0].strip()
     pdf_pars.iPDF=0
+
+    # compute chi2, theory predictions, cov, cov_inv, and theory - data
     (chiarr[0],theory0,cov0,cov0in,diffs0)=chi2corr(fit_pars.imindat,imax-1,vp_pdf)
     
     tarr=[theory0]
@@ -1893,7 +1899,11 @@ def jaccalc_newmin(label_arr,label_arrm,eps_arr,hess_calc, vp_pdf=None):
         pdf_pars.PDFlabel=label_arr[ip].strip()
 
         parameter_index = pdf_pars.par_free_i[ip - 1]
+
+        # compute derivative of the PDF wrt the free parameter parameter_index
         pdf_derivative = vp_pdf.make_derivative(parameter_index)
+        
+        # compute J_i, i.e. the derivative of the theory predictions wrt the free parameter i=parameter_index (theory)
         (chiarr[ip],theory,cov,covin,diffs_out)=chi2corr(fit_pars.imindat,imax-1, vp_pdf=pdf_derivative)
         tarr.append(theory)
         diffsarr.append(diffs_out)
@@ -1913,12 +1923,16 @@ def jaccalc_newmin(label_arr,label_arrm,eps_arr,hess_calc, vp_pdf=None):
         
 
         # print(tarr[ip])
-        test1=-2.*tarr[ip]@cov0in@diffsarr[0]
+
+        # compute the derivative of the chi2 wrt the free parameter parameter_index
+        # Eq.6 https://people.duke.edu/~hpgavin/lm.pdf
+        test1=-2.*tarr[ip]@cov0in@diffsarr[0] 
         jacarr[ip]=test1
         # print(np.sum(tarr[ip]))
 
 
         if(hess_calc):
+            # compute the diagonal entries of the hessian, defined as J cov0in J^T
             if ip==1:
                 tii0=hess_ii_calc_newmin(tarr[ip],cov0,cov0in)
                 print(tii0)
@@ -1926,12 +1940,14 @@ def jaccalc_newmin(label_arr,label_arrm,eps_arr,hess_calc, vp_pdf=None):
             else:
                 tii0=hess_ii_calc_newmin(tarr[ip],cov0,cov0in)
                 tii.append(tii0)
-                    
+        # I guess this should also happen only if(hess_calc)?         
         for jp in range(1,ip+1):
             if ip==jp:
+                # fill the diagonal
                 hii=tii[ip-1]
                 hessarr[ip,jp]=hii
             else:
+                # compute the off-diagonal entries of the hessian (lower-triangular entries)
                 hij=hess_ij_calc_newmin(tarr[ip],tarr[jp],cov0in)
                 hessarr[ip,jp]=hij
     
@@ -1939,8 +1955,10 @@ def jaccalc_newmin(label_arr,label_arrm,eps_arr,hess_calc, vp_pdf=None):
 
     hessarr=np.delete(hessarr,0,0)
     hessarr=np.delete(hessarr,0,1)
+    # compute the missing entries of the hessian using the fact that it s symmetric
     hessarr=hessarr+hessarr.T-np.diag(hessarr.diagonal()) 
     
+    # save the chi2
     out0=chiarr[0]
     
     chiarr=np.zeros((pdf_pars.npar_free+1))
@@ -1948,6 +1966,7 @@ def jaccalc_newmin(label_arr,label_arrm,eps_arr,hess_calc, vp_pdf=None):
     penarr=np.zeros((pdf_pars.npar_free+1))
 
     if fit_pars.pos_const:
+        # what about this?
         for ip in range(0,pdf_pars.npar_free+1):
             pdf_pars.PDFlabel=label_arr[ip].strip()
             out31=pos_calc(fit_pars.pos_data31)
@@ -1960,6 +1979,7 @@ def jaccalc_newmin(label_arr,label_arrm,eps_arr,hess_calc, vp_pdf=None):
             chiarr[ip]=chiarr[ip]+out1
 
     if fit_pars.pos_const:
+        # what about this?
         for ip in range(1,pdf_pars.npar_free+1):
             pdf_pars.PDFlabel=label_arrm[ip].strip()
             out31m=pos_calc(fit_pars.pos_data31)            
@@ -2078,7 +2098,7 @@ def jaccalc(label_arr,label_arrm,eps_arr,hess_calc, vp_pdf=None):
 
     hessarr=np.delete(hessarr,0,0)
     hessarr=np.delete(hessarr,0,1)
-    hessarr=hessarr+hessarr.T-np.diag(hessarr.diagonal()) 
+    hessarr=hessarr+hessarr.T-np.diag(hessarr.diagonal()) # hessian is symmetric, so fill the remaining entries
     
     out0=chiarr[0]
     
