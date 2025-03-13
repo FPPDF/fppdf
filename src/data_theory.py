@@ -14,7 +14,7 @@ from validphys.fkparser import load_fktable
 from validphys.kinematics import *
 import operator
 import lhapdf
-from validphys.commondataparser import load_commondata
+from nnpdf_data.commondataparser import load_commondata
 from validphys.convolution import OP
 import functools
 from validphys.pdfbases import evolution
@@ -207,7 +207,7 @@ def _predictions_2pdfs_new(dataset, fkfunc, pdf1, pdf2=None):
     """
     if not DEBUG:
         print("We should not be entering here! Who's calling me?")
-    raise Exception
+        raise Exception
     
     opfunc = OP[dataset.op]
     if dataset.cuts is None:

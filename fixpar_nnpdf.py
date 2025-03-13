@@ -9,7 +9,7 @@ import validphys.convolution as conv
 import validphys.results as rs
 from validphys.covmats import covmat_from_systematics
 import numpy as np
-from validphys.commondataparser import load_commondata
+from nnpdf_data.commondataparser import load_commondata
 import validphys.commondata as cdat
 import pandas as pd
 from validphys.calcutils import calc_chi2

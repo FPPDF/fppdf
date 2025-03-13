@@ -272,14 +272,14 @@ def chi2min_fun(afree, jac_calc = False, hess_calc = False, vp_pdf=None):
 
     return(out,jac,hess,err,hessp)
 
-def chi2corr(imin, imax, vp_pdf=None):
+def chi2corr(imin, imax, vp_pdf=None, theta_idx=None):
     # TODO: add docstr
     """ """
     if(pdf_closure.pdpdf):
         (out,theorytot,cov,covin)=chi2corr_pdf()
         diffs_out=0.
     else:
-        (out,theorytot,cov,covin,diffs_out)=chi2corr_global(imin, imax, vp_pdf)
+        (out,theorytot,cov,covin,diffs_out)=chi2corr_global(imin, imax, vp_pdf, theta_idx=theta_idx)
 
     return (out,theorytot,cov,covin,diffs_out)
     
@@ -674,7 +674,7 @@ def chi2corr_ind(i):
 
     return (out,ndat,dlabel)
 
-def chi2corr_global(imin, imax, vp_pdf=None):
+def chi2corr_global(imin, imax, vp_pdf=None, theta_idx=None):
     """Compute chi2 for the global dataset.
     Takes from index 0 of the dataset all the way to index imax
     as defined in ``global_pars.fit_pars.dataset_40``.
@@ -784,9 +784,13 @@ def chi2corr_global(imin, imax, vp_pdf=None):
         #         "use_cuts": "internal",                                                                                               
         #         "theoryid": fit_pars.theoryidi,                                                                         
         #     }    
-
-        if vp_pdf is not None:
-            # NB: checked that it produce the same values as the line below
+        
+        if vp_pdf is not None and theta_idx is not None:
+            # computing derivative of th prediction wrt free parameter theta_idx
+            theory = vp_pdf.derivative_th_predictions("internal", fit_pars.theoryidi, dataset_testii, theta_idx)
+        elif vp_pdf is not None:
+            # computing central value of th prediction.
+            # In order to use this aslo to compute the derivative we need to modify vp API allowing central_predictions to take 2 pdfs as input
             theory = API.central_predictions(**inptt).values[:,0]
         else:
             theory=theory_calc(i,dataset_testii,inptt,fit_pars.cftrue[i])
@@ -1904,7 +1908,8 @@ def jaccalc_newmin(label_arr,label_arrm,eps_arr,hess_calc, vp_pdf=None):
         pdf_derivative = vp_pdf.make_derivative(parameter_index)
         
         # compute J_i, i.e. the derivative of the theory predictions wrt the free parameter i=parameter_index (theory)
-        (chiarr[ip],theory,cov,covin,diffs_out)=chi2corr(fit_pars.imindat,imax-1, vp_pdf=pdf_derivative)
+        # NB: for the time being vp_pdf=vp_pdf, but if using API.central_predictions to compute derivative then it should be vp_pdf=pdf_derivative
+        (chiarr[ip],theory,cov,covin,diffs_out)=chi2corr(fit_pars.imindat,imax-1, vp_pdf=vp_pdf, theta_idx=parameter_index)
         tarr.append(theory)
         diffsarr.append(diffs_out)
         if(chi2_pars.uset0cov):

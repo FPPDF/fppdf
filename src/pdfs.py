@@ -8,6 +8,7 @@ from scipy.misc import derivative as deriv
 
 from validphys.core import PDF
 from validphys.lhapdfset import LHAPDFSet
+from validphys.api import API
 
 def _derivative(func, fl, parameters, x, eps):
     """The scipy.misc.derivative function is deprecated and won't exist in newer versions
@@ -20,6 +21,12 @@ def _derivative(func, fl, parameters, x, eps):
     weights = np.array([1, -8, 8, -1]) / 12.0
     funvals = np.array([func(fl, p, x) for p in parameters])
     return np.sum(funvals * weights) / np.sum(eps)
+
+def _derivative_th_prediction(func, use_cuts, theoryid, dataset_input, parameters, eps):
+    """As _derivative but specialized for the th_predictions function"""
+    weights = np.array([1, -8, 8, -1]) / 12.0
+    funvals = np.array([func(use_cuts, theoryid, dataset_input, p) for p in parameters])
+    return np.sum(funvals * weights[:,np.newaxis],axis=0) / np.sum(eps)
 
 
 class MSHTSet(LHAPDFSet):
@@ -146,6 +153,27 @@ class MSHTPDF(PDF):
         t0_version = deepcopy(self._lhapdf_set)
         t0_version._error_type = "t0"
         return t0_version
+
+    def th_predictions(self, use_cuts, theoryid, dataset_input, parameters):
+        """Compute theory predictions given the PDF"""
+        pdf = self.__class__(
+            pdf_function=self._pdf_function,
+            pdf_parameters=parameters
+        )
+        return API.central_predictions(use_cuts=use_cuts, theoryid=theoryid, pdf=pdf, dataset_input=dataset_input).values[:,0]
+
+    def derivative_th_predictions(self, use_cuts, theoryid, dataset_input, theta_idx):
+        """Compute the derivative of the theory predictions wrt the free parameter theta_idx"""
+        derivatives = []
+        variation = np.maximum(1e-12, 1e-5 * np.abs(self._pdf_parameters[theta_idx]))
+        # Compute the 4 variations needed for the derivative
+        for k in [-2, -1, 1, 2]:
+            derivatives.append(
+                parinc_newmin(
+                    self._pdf_parameters, theta_idx, k * variation, true_idx=True
+                )[0]
+            )
+        return _derivative_th_prediction(self.th_predictions, use_cuts, theoryid, dataset_input, derivatives, variation)
 
 def func_pdfs_diff(eps,ipdf=1,x=0.0,iorder=5):
 
