@@ -234,7 +234,9 @@ def _predictions_2pdfs_new(dataset, fkfunc, pdf1, pdf2=None):
             elif dataset.op == 'RATIO' or dataset.op == 'ASY' or dataset.op == 'COM':
                 fk_w_cuts_arr.append(fk_w_cuts)
             else:
-                all_predictions.append(fkfunc(dataset,fk_w_cuts, pdf1, pdf2))
+#                all_predictions.append(fkfunc(dataset,fk_w_cuts, pdf1, pdf2))
+                fkapp=fkfunc(dataset,fk_w_cuts, pdf1, pdf2)+fkfunc(dataset,fk_w_cuts, pdf2, pdf1)
+                all_predictions.append(fkapp)
         else:
             if dataset.op == 'RATIO':
                 fk_w_cuts_arr.append(fk_w_cuts)
