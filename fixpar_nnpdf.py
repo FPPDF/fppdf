@@ -525,7 +525,7 @@ elif(use_levmar):
 
 
             chi2_pars.t0=False
-            chi2_pars.t0_noderiv=False
+            chi2_pars.t0_noderiv=True
             # chi2_pars.diff_2=True
 
             # TODO this should open a context manager and pass down the file already opened
