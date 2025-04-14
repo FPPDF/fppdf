@@ -17,8 +17,6 @@ import scipy.linalg as la
 import os
 import lhapdf
 import shutil as sh
-from scipy.integrate import quadrature
-from scipy.integrate import fixed_quad
 from validphys.covmats import dataset_inputs_covmat_from_systematics
 from validphys.pseudodata import make_replica
 from scipy.optimize import minimize
@@ -255,7 +253,11 @@ if fit_pars.theoryidi==212:
     fit_pars.dataset_40=fit_pars.dataset_40_nlo
     fit_pars.imaxdat=len(fit_pars.dataset_40)
 
-pdf_pars.lhapdfdir = get_lha_datapath() + "/"
+if os.environ.get("LHAPDF_DATA_PATH") is not None:
+    pdf_pars.lhapdfdir = os.environ["LHAPDF_DATA_PATH"]
+else:
+    pdf_pars.lhapdfdir = get_lha_datapath() + "/"
+
 if DEBUG:
     pdf_pars.tmp_lhapdfdir = TEMP_LHAPDF
 profile=_get_nnpdf_profile(None)

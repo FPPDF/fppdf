@@ -3,8 +3,12 @@ from global_pars import *
 from chebyshevs import *
 from copy import deepcopy
 import numpy as np
-from scipy.integrate import quadrature
-from scipy.misc import derivative as deriv
+try:
+    from scipy.integrate import quadrature
+    from scipy.misc import derivative as deriv
+except ImportError:
+    from scipy.integrate import quad as quadrature
+    from scipy.differentiate import derivative as deriv
 
 from validphys.core import PDF
 from validphys.lhapdfset import LHAPDFSet
@@ -120,6 +124,9 @@ class MSHTPDF(PDF):
         self._pdf_parameters = pdf_parameters
         self._variation = variation
         self._theta_idx = theta_idx
+
+        # Add a hash of the parameter to the name to make them unique and update cached quantities
+        name = f"{name}_{hash(pdf_parameters.tostring())}"
         super().__init__(name, None)
 
         # Create some fake info:
