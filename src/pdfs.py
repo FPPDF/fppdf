@@ -1049,8 +1049,8 @@ def parcheck(pars):
 
     if(basis_pars.g_second_term):
         
-        if etagm < -1:
-            print('PARCHECK : etagm < -1')
+        if etagm < 0:
+            print('PARCHECK : etagm < 0')
             err=True
             
         if delgm < -1:
