@@ -10,7 +10,11 @@ To run simply execute:
 
 python fixpar_nnpdf.py --config=configs/**.yaml
 
-for the corresponding .yaml file. Some explanation of the various flags is provided in the example .yaml files but clearly this needs better documentation + some specific example cases to be provided.
+for the corresponding .yaml file. Some explanation of the various flags is provided in the example .yaml files but clearly this needs better documentation + some specific example cases to be provided. Adding to this, to run:
+
+- A fixed chi^2 output. Set fixpar to False. 
+- A fit. Set fixpar to True. The second column of 0/1's in the input file (in input/) specify whether a given parmeter is free (1) or fixed (0). If all are fixed this will be as if fixpar is set to True. The parameters for the best fit will be output to outputs/pars/$label.dat and the covariance matrix to outputs/cov/$label.dat.
+- An eigenvector scan. Set readcov to True, with the 'cov input file' given by the output of a previous fit. Then specify if dynamic tolerance is used (dynamic_tol) and if not the size of the fixed tolerance (t2_err).
 
 The outputs are in the outputs/ folder:
 

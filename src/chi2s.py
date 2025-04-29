@@ -872,6 +872,25 @@ def chi2corr_global(imin, imax, vp_pdf=None, theta_idx=None):
             dload_pars.covt0=cov
             dload_pars.covt0_inv=covin
             dload_pars.dcov=0
+            # LHL ADDED NEW - so that t0 def is used in minimisation
+        elif chi2_pars.t0_noderiv: 
+            if dload_pars.dcov==1:
+                try:
+                    # cov = API.dataset_inputs_t0_covmat_from_systematics(**inpt0)
+                    cov = API.dataset_inputs_covmat_t0_considered(**vp_input, dataset_inputs = all_ds_input, use_t0=True, t0pdfset=vp_pdf)
+                    covin=la.inv(cov)
+                except (la.LinAlgError,ValueError) as err:
+                    print('t0 cov may be ill behaved, trying exp cov instead...')
+                    cov=dload_pars.covexp
+                    covin=dload_pars.covexp_inv
+                print('t0 cov2...')
+                # cov = API.dataset_inputs_covmat_t0_considered(**vp_input, dataset_inputs = all_ds_input, use_t0=True, t0pdfset=vp_pdf)
+                # # print(cov)
+                # covin = la.inv(cov)
+                dload_pars.covt0=cov
+                dload_pars.covt0_inv=covin
+                print('...finish')    
+                dload_pars.dcov=0
         else:
             dload_pars.covexp=cov
             dload_pars.covexp_inv=covin

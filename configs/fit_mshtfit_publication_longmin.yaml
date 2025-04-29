@@ -46,6 +46,10 @@ pseudodata flags:
   pdin: False
 
 fit pars:
+  # Use dynamic tolerance in error calc
+  dynamic_tol: False
+  # T value for error calculation
+  t2_err: 1.
   # Only use t0 for chi2i and chi2o in levmar (i.e. no derivative at all)
   t0_noderivin: True
   # run with fixed input parameters (override input card flags)
