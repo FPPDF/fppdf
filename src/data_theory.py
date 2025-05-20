@@ -54,7 +54,7 @@ def _elu(x, alpha=1e-7):
 
 
 def pos_calc(pdata, vp_pdf) -> float:
-    """Compute positivity penalty ter
+    """Compute positivity penalty term
     Takes as input a list of dicts containing a positivity dataset {dataset} and a pdf
     """
     if vp_pdf is None:

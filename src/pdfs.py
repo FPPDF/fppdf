@@ -281,11 +281,6 @@ def pdfs_msht_basis(ipdf,pars,x):
     """Compute the PDF ``ipdf`` in the MSHT basis at point ``x``
     given the set of parameters ``pars``.
     """
-    # TODO: this could be trivially vectorized in x
-    # and can be also done in flavour to avoid python loops outside
-
-    # TODO: also, parameters positions are constant during a run
-
     # Read up the global parameters before calling the compiled functions
     cheb8 = basis_pars.Cheb_8
     g_cheb7 = basis_pars.g_cheb7
