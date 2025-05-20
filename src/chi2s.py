@@ -593,6 +593,9 @@ def chi2corr_global(imin, imax, vp_pdf=None, theta_idx=None):
         # intersection=[{"dataset_inputs": dload_pars.dscomb, "theoryid": 212}]
         intersection=[{"dataset_inputs": dload_pars.dscomb, "theoryid": 200}]
 
+    if vp_pdf is None:
+        raise Exception("A PDF needs to be given")
+
 
     din=[fit_pars.dataset_40[imin]]
 
@@ -616,9 +619,7 @@ def chi2corr_global(imin, imax, vp_pdf=None, theta_idx=None):
     # 3. theory results -> data, cuts, theory
     # if the replicas were prepared beforehand that would speed up things though
 
-    vp_input = {"use_cuts": "internal", "theoryid": fit_pars.theoryidi}
-    if vp_pdf is not None:
-        vp_input["pdf"] = vp_pdf
+    vp_input = {"use_cuts": "internal", "theoryid": fit_pars.theoryidi, "pdf": vp_pdf}
     theorytot = []
 
     for i in range(imin,imax+1):
@@ -1523,31 +1524,6 @@ def jaccalc_d4(label_arr,label_arrm,label_arrm2,label_arrp2,eps_arr,hess_calc,il
 
     return (out0,out1,jacarr,hessarr)
 
-def jaccalc_d0(label_arr,eps_arr,il,ih):
-
-    chiarr=np.zeros((pdf_pars.npar_free+1))
-    pdf_pars.PDFlabel=label_arr[0].strip()
-
-    print(pdf_pars.PDFlabel)
-
-    (chiarr[0],theory0,cov0,cov0in,diffs_out)=chi2corr(il,ih-1)
-    difft=[0.]
-
-    out0=chiarr[0]
-
-    for ip in range(1,pdf_pars.npar_free+1):
-        pdf_pars.PDFlabel=label_arr[ip].strip()
-        (chiarr[ip],theoryp,cov,covin,diffs_out)=chi2corr(il,ih-1)
-
-    for ip in range(1,pdf_pars.npar_free+1):
-
-        chiarr[ip]=chiarr[ip]-out0
-        chiarr[ip]=chiarr[ip]/eps_arr[ip]
-
-    chiarr=np.delete(chiarr,0)
-    jacarr=chiarr
-
-    return jacarr
 
 def jaccalc_newmin(label_arr,label_arrm,eps_arr,hess_calc, vp_pdf=None):
     """Compute the derivative of the chi2 wrt the free parameters 
@@ -1686,152 +1662,7 @@ def jaccalc_newmin(label_arr,label_arrm,eps_arr,hess_calc, vp_pdf=None):
     hessparr=np.delete(hessparr,0,1)
     
     jacarr=jacarr+chiarr
-
-    # print(jacarr)
-    # print(hessarr)
-    # os.quit()
-
-    # fit_pars.pdf_dict=[]
-
     return(jacarr,hessarr,out0,out1,hessparr)
-
-def jaccalc(label_arr,label_arrm,eps_arr,hess_calc, vp_pdf=None):
-    # TODO
-
-    print('JACCALC OLDMIN')
-
-    imax=fit_pars.imaxdat
-
-    chiarr=np.zeros((pdf_pars.npar_free+1))
-    jacarr=np.zeros((pdf_pars.npar_free+1))
-    hessarr=np.zeros((pdf_pars.npar_free+1,pdf_pars.npar_free+1))
-
-    pdf_pars.PDFlabel=label_arr[0].strip()
-    pdf_pars.iPDF=0
-    (chiarr[0],theory0,cov0,cov0in,diffs_out)=chi2corr(fit_pars.imindat,imax-1,vp_pdf)
-    
-    tarr=[theory0]
-    covarr=[cov0]
-
-    # print('chi2  = ',chiarr[0])
-
-    print(pdf_pars.npar_free)
-
-    for ip in range(1,pdf_pars.npar_free+1):
-        # print(ip)
-        pdf_pars.iPDF=ip
-        pdf_pars.PDFlabel=label_arr[ip].strip()
-        (chiarr[ip],theory,cov,covin,diffs_out)=chi2corr(fit_pars.imindat,imax-1,vp_pdf)
-        tarr.append(theory)
-        if(chi2_pars.uset0cov):
-            covarr.append(cov)
-        
-    for ip in range(1,pdf_pars.npar_free+1):
-
-        test1=chiarr[ip]-chiarr[0]
-        test1=test1/eps_arr[ip]
-        jacarr[ip]=test1   
-
-        # print(test1)
-        # os.quit() 
-
-        if(hess_calc):
-
-            if chi2_pars.uset0cov:
-
-                if ip==1:
-                    (tiia,tiib,tiic)=hess_ii_calc_t0(theory0,tarr[ip],cov0,covarr[ip],chiarr[0])
-                    tii=[tiia]
-                    ti1=[tiib]
-                    ti2=[tiic]
-                else:
-                    (tiia,tiib,tiic)=hess_ii_calc_t0(theory0,tarr[ip],cov0,covarr[ip],chiarr[0])
-                    tii.append(tiia)
-                    ti1.append(tiib)
-                    ti2.append(tiic)
-                    
-            else:
-                
-                if ip==1:
-                    # tii0=hess_ii_calc_not0(theory0/eps_arr[ip],tarr[ip]/eps_arr[ip],cov0,cov0in)
-                    tii0=hess_ii_calc_not0(theory0,tarr[ip],cov0,cov0in)
-                    tii=[tii0]
-                    # print(np.sum((tarr[ip]-theory0)/eps_arr[ip]))
-                    # print(tii0/np.power(eps_arr[ip],2))
-                else:
-                    tii0=hess_ii_calc_not0(theory0,tarr[ip],cov0,cov0in)
-                    tii.append(tii0)
-                    
-            for jp in range(1,ip+1):
-                # print(ip,jp)
-                if ip==jp:
-                    hii=tii[ip-1]
-                    hii=hii/np.power(eps_arr[ip],2)
-                    hessarr[ip,jp]=hii
-                else:
-                    if(chi2_pars.uset0cov):
-                        hij=hess_ij_calc_new(theory0,tarr[ip],tarr[jp],cov0,covarr[ip],covarr[jp],ti1[ip-1],ti1[jp-1],ti2[ip-1],ti2[jp-1])
-                    else:
-                        # print('hij...')
-                        hij=hess_ij_calc_not0_new(tarr[ip],tarr[jp],tii[ip-1],tii[jp-1],cov0,cov0in)
-                        # print('...done')
-                    hij=hij/eps_arr[ip]/eps_arr[jp]
-                    hessarr[ip,jp]=hij
-    
-    jacarr=np.delete(jacarr,0)
-
-    hessarr=np.delete(hessarr,0,0)
-    hessarr=np.delete(hessarr,0,1)
-    hessarr=hessarr+hessarr.T-np.diag(hessarr.diagonal()) # hessian is symmetric, so fill the remaining entries
-    
-    out0=chiarr[0]
-    
-    chiarr=np.zeros((pdf_pars.npar_free+1))
-    chiarrm=np.zeros((pdf_pars.npar_free+1))
-    penarr=np.zeros((pdf_pars.npar_free+1))
-
-    if fit_pars.pos_const:
-        for ip in range(0,pdf_pars.npar_free+1):
-            pdf_pars.PDFlabel=label_arr[ip].strip()
-            out31=pos_calc(fit_pars.pos_data31)
-            if(fit_pars.pos_40):
-                out40=pos_calc(fit_pars.pos_data40)
-                chi2pos=out31+out40
-                out1=chi2pos
-            else:
-                out1=out31
-            chiarr[ip]=chiarr[ip]+out1
-
-    if fit_pars.pos_const:
-        for ip in range(1,pdf_pars.npar_free+1):
-            pdf_pars.PDFlabel=label_arrm[ip].strip()
-            out31m=pos_calc(fit_pars.pos_data31)            
-            if(fit_pars.pos_40):
-                out40m=pos_calc(fit_pars.pos_data40)
-                chi2posm=out31m+out40m
-                out1m=chi2posm
-            else:
-                out1m=out31m
-
-            chiarrm[ip]=chiarrm[ip]+out1m    
-
-    out1=chiarr[0]
-
-    hessparr=np.zeros((pdf_pars.npar_free+1,pdf_pars.npar_free+1))
-
-    chiarr=np.delete(chiarr,0)
-
-    hessparr=np.delete(hessparr,0,0)
-    hessparr=np.delete(hessparr,0,1)
-    
-    jacarr=jacarr+chiarr
-
-    # print(jacarr)
-    # print(hessarr)
-    # os.quit()
-
-    return(jacarr,hessarr,out0,out1,hessparr)
-    
 
 
 def jaccalc_d2(label_arr,label_arrm,eps_arr,hess_calc,il,ih):

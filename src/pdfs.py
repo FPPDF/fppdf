@@ -4,17 +4,16 @@ from chebyshevs import *
 from copy import deepcopy
 import numpy as np
 import numba as nb
+
 try:
     from scipy.integrate import quadrature
-    from scipy.misc import derivative as deriv
 except ImportError:
     from scipy.integrate import quad as quadrature
-    from scipy.differentiate import derivative as deriv
 
 from validphys.core import PDF
 from validphys.lhapdfset import LHAPDFSet
-from validphys.api import API
 from validphys.convolution import central_predictions
+
 
 def _derivative(func, fl, parameters, x, eps):
     """The scipy.misc.derivative function is deprecated and won't exist in newer versions
@@ -28,6 +27,7 @@ def _derivative(func, fl, parameters, x, eps):
     funvals = np.array([func(fl, p, x) for p in parameters])
     return np.sum(funvals * weights) / np.sum(eps)
 
+
 def _derivative_th_prediction(func, dataset, parameters, eps):
     """As _derivative but specialized for the th_predictions function.
     Takes as input the function to be called (``func``) which must have as signature (dataset, parameters) -> result
@@ -35,12 +35,23 @@ def _derivative_th_prediction(func, dataset, parameters, eps):
     """
     weights = np.array([1, -8, 8, -1]) / 12.0
     funvals = np.array([func(dataset, p) for p in parameters])
-    return np.sum(funvals * weights[:,np.newaxis],axis=0) / np.sum(eps)
+    return np.sum(funvals * weights[:, np.newaxis], axis=0) / np.sum(eps)
+
+
+class _Hashrray:
+    def __init__(self, xgrid):
+        self.xgrid = xgrid
+
+    def __hash__(self):
+        return hash(self.xgrid.tobytes())
 
 
 class MSHTSet(LHAPDFSet):
     """Provides a few lhapdf-like functions to trick vp into thinking it is an LHAPDFset
-    Can work with any function with a signature of (flavour, parameters, x)
+
+    Can work with any function with a signature of:
+
+        pdf_function(flavour:int, parameters: np.ndarray, xgrid: np.ndarray) -> np.ndarray
     """
 
     def __init__(
@@ -68,9 +79,7 @@ class MSHTSet(LHAPDFSet):
             # Compute the 4 variations needed for the derivative
             for k in [-2, -1, 1, 2]:
                 self._derivatives.append(
-                    parinc_newmin(
-                        self._parameters, theta_idx, k * variation, true_idx=True
-                    )[0]
+                    parinc_newmin(self._parameters, theta_idx, k * variation, true_idx=True)[0]
                 )
 
     def __hash__(self):
@@ -83,19 +92,20 @@ class MSHTSet(LHAPDFSet):
         """Whether this is a PDF of its derivative"""
         return self._variation is not None
 
-    @functools.cache
-    def xfxQ(self, x:float, Q:float, n:int, fl:int):
+    @cache
+    def _xfxQ(self, x: _Hashrray, Q: float, n: int, fl: int):
         """Return the PDF value for one single point for one single member
         Note that in this case both scale (Q) and member (n) are ignored.
         """
         if fl == 21:
             fl = 0
+        x = x.xgrid
         if self.is_derivative:
-            return _derivative(
-                self._pdf_function, fl, self._derivatives, x, self._variation
-            )
-        else:
-            return self._pdf_function(fl, self._parameters, x)
+            return _derivative(self._pdf_function, fl, self._derivatives, x, self._variation)
+        return self._pdf_function(fl, self._parameters, x)
+
+    def xfxQ(self, x: np.ndarray, Q: float, n: int, fl: int):
+        return self._xfxQ(_Hashrray(x), Q, n, fl)
 
     def grid_values(self, flavors: np.ndarray, xgrid: np.ndarray, qgrid: np.ndarray):
         """Returns the PDF values for every member for the required flavors, x, q
@@ -105,9 +115,7 @@ class MSHTSet(LHAPDFSet):
         """
         out_ret = []
         for fl in flavors:
-            tmp = []
-            for x in xgrid:
-                tmp.append(self.xfxQ(x, None, None, fl))
+            tmp = self.xfxQ(xgrid, None, None, fl)
             out_ret.append(tmp)
         return np.array(out_ret).reshape(1, len(flavors), -1, 1)
 
@@ -152,7 +160,7 @@ class MSHTPDF(PDF):
             self._pdf_parameters,
             self.name,
             variation=self._variation,
-            theta_idx=self._theta_idx
+            theta_idx=self._theta_idx,
         )
 
     def make_derivative(self, idx, eps=1e-5):
@@ -176,11 +184,8 @@ class MSHTPDF(PDF):
 
     def th_predictions(self, ds, parameters):
         """Compute theory predictions given the PDF"""
-        pdf = self.__class__(
-            pdf_function=self._pdf_function,
-            pdf_parameters=parameters
-        )
-        return central_predictions(ds, pdf).values[:,0]
+        pdf = self.__class__(pdf_function=self._pdf_function, pdf_parameters=parameters)
+        return central_predictions(ds, pdf).values[:, 0]
 
     def derivative_th_predictions(self, ds, theta_idx):
         """Compute the derivative of the theory predictions wrt the free parameter theta_idx"""
@@ -189,53 +194,15 @@ class MSHTPDF(PDF):
         # Compute the 4 variations needed for the derivative
         for k in [-2, -1, 1, 2]:
             derivatives.append(
-                parinc_newmin(
-                    self._pdf_parameters, theta_idx, k * variation, true_idx=True
-                )[0]
+                parinc_newmin(self._pdf_parameters, theta_idx, k * variation, true_idx=True)[0]
             )
         return _derivative_th_prediction(self.th_predictions, ds, derivatives, variation)
 
-def func_pdfs_diff(eps,ipdf=1,x=0.0,iorder=5):
 
-    # print(eps)
-
-    if eps == 0.:
-        out=pdfs_msht(ipdf,pdf_pars.parinarr[0,:],x)
-        if pdf_pars.parin_newmin_reset:
-            pdf_pars.parinarr_newmin[pdf_pars.parin_newmin_counter,:]=pdf_pars.parinarr[0,:]
-    else:
-        if pdf_pars.parin_newmin_reset:
-            (pars,eps_out)=parinc_newmin(pdf_pars.parinarr[0,:],chi2_pars.ipdf_newmin-1,eps)
-            pdf_pars.parinarr_newmin[pdf_pars.parin_newmin_counter,:]=pars
-        else:
-            pars=pdf_pars.parinarr_newmin[pdf_pars.parin_newmin_counter,:]
-        out=pdfs_msht(ipdf,pars,x)
-
-    pdf_pars.parin_newmin_counter+=1
-
-    return out
-
-def pdfs_diff(ipdf, x=None, parin=None):
-    eps=1e-5
-    # (pars,eps_out)=parinc_newmin(pdf_pars.parinarr[0,:],chi2_pars.ipdf_newmin-1,eps)
-
-    eps=parinc_eps(pdf_pars.parinarr[0,:],chi2_pars.ipdf_newmin-1,eps)
-
-    pdf_pars.parin_newmin_counter=0
-    iorder=5
-    pdfout=deriv(func_pdfs_diff,0.,eps,args=(ipdf,x,iorder),order=iorder)
-
-#     test = functools.partial(func_pdfs_diff, x=x, ipdf=ipdf)
-#     ret = _derivative(test, eps, ipdf, pdf_pars.parinarr[0,:], x)
-
-    mypdf = pdf_pars.derivatives
-    if pdfout > 1e-5 and chi2_pars.ipdf_newmin >0:
-        pass
-
-    pdf_pars.parin_newmin_reset=False
-
-    return pdfout
-
+###########################################################################################################################
+## This program can fit _any_ function with the following signature:
+## (flavour: int, parameters: np.ndarray, xgrid: np.ndarray) -> pdf_{flavour}(parameters)(xgrid): np.ndarray
+###################################################################################################################
 
 def pdfs_msht(ipdf: int, pars: np.ndarray, x: np.ndarray):
     """
@@ -306,7 +273,7 @@ def pdfs_msht(ipdf: int, pars: np.ndarray, x: np.ndarray):
     elif ipdf==4:
         out=pdfs_msht_basis(8,pars,x)/2.
     else:
-        out=0.
+        out=np.zeros_like(x)
         
     return out
         
@@ -598,7 +565,7 @@ def q_msht(x, ain, cheb8: bool = False):
     aqc6=ain[8]
 
     if aq < 1e-20:
-        return aq
+        return aq*np.ones_like(x)
 
     out=aq*np.power(1.-x,etaq)*np.power(x,delq)*(1.+aqc1*cheb_msht(1,x)+aqc2*cheb_msht(2,x)+aqc3*cheb_msht(3,x)+aqc4*cheb_msht(4,x)+aqc5*cheb_msht(5,x)+aqc6*cheb_msht(6,x))
 
@@ -688,7 +655,9 @@ def g_msht(x, ain, two_terms = False, g_cheb7 = False, cheb8 = False):
 
 
 @nb.njit
-def dbub_msht(xin,ain, cheb8=False):
+def dbub_msht(x, ain, cheb8=False):
+    """MSHT parametrization for db - ub
+    """
     aq=ain[0]
     etaq=ain[1]
     aqc1=ain[2]
@@ -698,9 +667,8 @@ def dbub_msht(xin,ain, cheb8=False):
     aqc5=ain[6]
     aqc6=ain[7]
 
-    x=xin
-    if etaq < 0. and xin > 0.999:
-        x=0.999
+    if etaq < 0.:
+        x = np.minimum(x, 0.999)
     
     out=aq*np.power(1.-x,etaq)*(1.+aqc1*cheb_msht(1,x)+aqc2*cheb_msht(2,x)+aqc3*cheb_msht(3,x)+aqc4*cheb_msht(4,x)+aqc5*cheb_msht(5,x)+aqc6*cheb_msht(6,x))
 
