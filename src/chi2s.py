@@ -128,9 +128,6 @@ def chi2min_fun(afree, jac_calc = False, hess_calc = False, vp_pdf=None):
                     parameter_index = pdf_pars.par_free_i[ip - 1]
                     pdf_derivative = vp_pdf.make_derivative(parameter_index)
                     pdf_pars.derivatives.append(pdf_derivative)
-                if DEBUG:
-                    initlha(name,pdf_pars.lhapdfdir)
-                    writelha(name,pdf_pars.lhapdfdir,parin1)
                 
                 pdf_pars.PDFlabel=name
                 pdf_pars.parin_newmin_reset=True
@@ -192,25 +189,6 @@ def chi2min_fun(afree, jac_calc = False, hess_calc = False, vp_pdf=None):
                 pdf_pars.idir+=pdf_pars.npar_free
         
     else:
-        if DEBUG:
-            # TODO: to be removed 
-            # when computing the chi2 no need to do anything with the PDF
-
-            name=inout_pars.label+'_run'+str(pdf_pars.idir) 
-            parin1=pdf_pars.pdfparsi.copy() 
-
-            pdf_pars.parinarr[0,:]=parin1
-            pdf_pars.iPDF=0
-
-            # write to temp lhapdf grid to be used by nnpdf code
-            if(pdf_pars.uselha):
-                # TODO: this might not be needed at all
-                # in any case here writelha uses always msht
-                chi2_pars.ipdf_newmin=0
-
-                initlha(name, pdf_pars.tmp_lhapdfdir)
-                pdf_pars.PDFlabel=name
-                writelha(name,pdf_pars.tmp_lhapdfdir,parin1)
 
         print("> Calculating chi2 <")
         chi=chi2totcalc(vp_pdf=vp_pdf)
@@ -766,9 +744,9 @@ def chi2corr_global(imin, imax, vp_pdf=None, theta_idx=None):
             fit_pars.pseud=False
             dattot0=dat_calc_rep(dload_pars.dscomb, genrep = False)
             fit_pars.pseud=True
-            dattot=dat_calc_rep(dload_pars.dscomb,cov, genrep = True)
+            dattot=dat_calc_rep(dload_pars.dscomb, genrep = True)
         else:  
-            dattot=dat_calc_rep(dload_pars.dscomb,cov)
+            dattot=dat_calc_rep(dload_pars.dscomb, genrep = False)
         chi2_pars.ndat=len(dattot)
         dload_pars.darr_gl=dattot
 

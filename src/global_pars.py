@@ -1043,7 +1043,7 @@ class DataHolder:
         and the separate functions will query what they need.
 
         dataset:
-            list of NNPDF dataset objects
+            list of NNPDF dataset DataSetSpec objects
     """
     datasets: tuple
     # NOTE: intersection cuts are being ignored, but should've been added upon construction
@@ -1052,9 +1052,13 @@ class DataHolder:
     def _data_dict(self):
         return {str(ds): ds for ds in self.datasets}
 
+    def select_dataset(self, name):
+        """Select dataset by name"""
+        return self._data_dict[_sanitize(name)]
+
     def select_datasets(self, names):
         """Select datasets given a list of names"""
-        return [self._data_dict[_sanitize(n)] for n in names]
+        return [self.select_dataset(n) for n in names]
 
     @cache
     def produce_covmat(self, pdf=None, imin=None, imax=None, names=None, use_t0 = True):
@@ -1088,11 +1092,6 @@ class DataHolder:
         covmat = self.produce_covmat(use_t0 = False, names=names)
 
         return make_replica(lcd, irep, covmat, genrep = genrep)
-        
-
-        
-
-
 
 
 
@@ -1100,14 +1099,23 @@ class DataHolder:
 
 # Limite the shared global data to what's available in this dictionary
 shared_global_data = {
-    "data": None
+    "data": None,
+    "posdata": None,
 }
 
 def shared_populate_data():
 
+    config = {
+            "theoryid": fit_pars.theoryidi,
+            "use_cuts": "internal"
+    }
+
     datasets = []
     for dinput in fit_pars.dataset_40:
-        ds = API.dataset(dataset_input=dinput, theoryid=fit_pars.theoryidi, use_cuts= "internal")
+        ds = API.dataset(dataset_input=dinput, **config)
         datasets.append(ds)
 
+    positivity_datasets = API.posdatasets(posdatasets = fit_pars.pos_data31 + fit_pars.pos_data40, **config)
+
     shared_global_data["data"] = DataHolder(tuple(datasets))
+    shared_global_data["posdata"] = DataHolder(tuple(positivity_datasets))
