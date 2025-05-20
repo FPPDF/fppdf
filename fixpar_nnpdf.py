@@ -330,6 +330,8 @@ else:
 
     vp_pdf = MSHTPDF(name = pdfname, pdf_parameters = pdf_parameters, pdf_function = "msht")
 
+##### TODO: start populating the shared data here
+shared_populate_data()
 
 
 if inout_pars.readcov:

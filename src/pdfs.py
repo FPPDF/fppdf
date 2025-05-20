@@ -3,6 +3,7 @@ from global_pars import *
 from chebyshevs import *
 from copy import deepcopy
 import numpy as np
+import numba as nb
 try:
     from scipy.integrate import quadrature
     from scipy.misc import derivative as deriv
@@ -13,6 +14,7 @@ except ImportError:
 from validphys.core import PDF
 from validphys.lhapdfset import LHAPDFSet
 from validphys.api import API
+from validphys.convolution import central_predictions
 
 def _derivative(func, fl, parameters, x, eps):
     """The scipy.misc.derivative function is deprecated and won't exist in newer versions
@@ -26,10 +28,13 @@ def _derivative(func, fl, parameters, x, eps):
     funvals = np.array([func(fl, p, x) for p in parameters])
     return np.sum(funvals * weights) / np.sum(eps)
 
-def _derivative_th_prediction(func, use_cuts, theoryid, dataset_input, parameters, eps):
-    """As _derivative but specialized for the th_predictions function"""
+def _derivative_th_prediction(func, dataset, parameters, eps):
+    """As _derivative but specialized for the th_predictions function.
+    Takes as input the function to be called (``func``) which must have as signature (dataset, parameters) -> result
+    Where dataset is a validphys Dataset object
+    """
     weights = np.array([1, -8, 8, -1]) / 12.0
-    funvals = np.array([func(use_cuts, theoryid, dataset_input, p) for p in parameters])
+    funvals = np.array([func(dataset, p) for p in parameters])
     return np.sum(funvals * weights[:,np.newaxis],axis=0) / np.sum(eps)
 
 
@@ -52,10 +57,12 @@ class MSHTSet(LHAPDFSet):
         self._flavors = None
         self._lhapdf_set = [None]
 
-        self._parameters = parameters
-        self._pdf_function = pdf_function
         self._derivatives = []
         self._variation = variation
+        self._parameters = parameters
+
+        # Given a PDF function, set the parameters up
+        self._pdf_function = pdf_function
 
         if variation is not None:
             # Compute the 4 variations needed for the derivative
@@ -66,12 +73,18 @@ class MSHTSet(LHAPDFSet):
                     )[0]
                 )
 
+    def __hash__(self):
+        """Uniqueness for this class is defined by the set of parameters,
+        which define the name, and whether the derivatives are active"""
+        return hash((self._name, self._derivatives is None))
+
     @functools.cached_property
     def is_derivative(self):
         """Whether this is a PDF of its derivative"""
         return self._variation is not None
 
-    def xfxQ(self, x, Q, n, fl):
+    @functools.cache
+    def xfxQ(self, x:float, Q:float, n:int, fl:int):
         """Return the PDF value for one single point for one single member
         Note that in this case both scale (Q) and member (n) are ignored.
         """
@@ -161,15 +174,15 @@ class MSHTPDF(PDF):
         t0_version._error_type = "t0"
         return t0_version
 
-    def th_predictions(self, use_cuts, theoryid, dataset_input, parameters):
+    def th_predictions(self, ds, parameters):
         """Compute theory predictions given the PDF"""
         pdf = self.__class__(
             pdf_function=self._pdf_function,
             pdf_parameters=parameters
         )
-        return API.central_predictions(use_cuts=use_cuts, theoryid=theoryid, pdf=pdf, dataset_input=dataset_input).values[:,0]
+        return central_predictions(ds, pdf).values[:,0]
 
-    def derivative_th_predictions(self, use_cuts, theoryid, dataset_input, theta_idx):
+    def derivative_th_predictions(self, ds, theta_idx):
         """Compute the derivative of the theory predictions wrt the free parameter theta_idx"""
         derivatives = []
         variation = np.maximum(1e-12, 1e-5 * np.abs(self._pdf_parameters[theta_idx]))
@@ -180,7 +193,7 @@ class MSHTPDF(PDF):
                     self._pdf_parameters, theta_idx, k * variation, true_idx=True
                 )[0]
             )
-        return _derivative_th_prediction(self.th_predictions, use_cuts, theoryid, dataset_input, derivatives, variation)
+        return _derivative_th_prediction(self.th_predictions, ds, derivatives, variation)
 
 def func_pdfs_diff(eps,ipdf=1,x=0.0,iorder=5):
 
@@ -223,18 +236,20 @@ def pdfs_diff(ipdf, x=None, parin=None):
 
     return pdfout
 
-def pdfs_msht(ipdf,pars,x):
+
+def pdfs_msht(ipdf: int, pars: np.ndarray, x: np.ndarray):
     """
         Compute a MSHT PDF given a set of parameters ``pars'' for x=x
     """
+    if pars is None or x is None:
+        raise ValueError("Cannot compute pdf")
+
     etaq=pars[57]
 
     if etaq < 0.0:
         etaqt=np.power(1.-x,-etaq)
     else:
         etaqt=1.
-
-        
 
     if ipdf==-3:
         sm=pdfs_msht_basis(6,pars,x)
@@ -296,42 +311,55 @@ def pdfs_msht(ipdf,pars,x):
     return out
         
 def pdfs_msht_basis(ipdf,pars,x):
+    """Compute the PDF ``ipdf`` in the MSHT basis at point ``x``
+    given the set of parameters ``pars``.
+    """
+    # TODO: this could be trivially vectorized in x
+    # and can be also done in flavour to avoid python loops outside
+
+    # TODO: also, parameters positions are constant during a run
+
+    # Read up the global parameters before calling the compiled functions
+    cheb8 = basis_pars.Cheb_8
+    g_cheb7 = basis_pars.g_cheb7
+    two_terms = basis_pars.g_second_term
 
     if ipdf==1:
-        # auv=pars[0:9].copy()
-        auv=pars[basis_pars.i_uv_min:basis_pars.i_uv_max].copy()
-        out=q_msht(x,auv)
-    if ipdf==2:
+        # adv=pars[0:9]
+        auv=pars[basis_pars.i_uv_min:basis_pars.i_uv_max]
+        out=q_msht(x,auv, cheb8=cheb8)
+    elif ipdf==2:
         # adv=pars[9:18]
-        adv=pars[basis_pars.i_dv_min:basis_pars.i_dv_max].copy()
-        out=q_msht(x,adv)
-    if ipdf==3:
+        adv=pars[basis_pars.i_dv_min:basis_pars.i_dv_max]
+        out=q_msht(x,adv, cheb8=cheb8)
+    elif ipdf==3:
         # asea=pars[18:27]
-        asea=pars[basis_pars.i_sea_min:basis_pars.i_sea_max].copy()
-        out=q_msht(x,asea)
-    if ipdf==4:
+        asea=pars[basis_pars.i_sea_min:basis_pars.i_sea_max]
+        out=q_msht(x,asea, cheb8=cheb8)
+    elif ipdf==4:
         # asp=pars[27:36]
-        asp=pars[basis_pars.i_sp_min:basis_pars.i_sp_max].copy()
-        out=q_msht(x,asp)
-    if ipdf==5:
+        asp=pars[basis_pars.i_sp_min:basis_pars.i_sp_max]
+        out=q_msht(x,asp, cheb8=cheb8)
+    elif ipdf==5:
         # ag=pars[36:46]
-        ag=pars[basis_pars.i_g_min:basis_pars.i_g_max].copy()
-        out=g_msht(x,ag)
-    if ipdf==6:
+        ag=pars[basis_pars.i_g_min:basis_pars.i_g_max]
+        out=g_msht(x, ag, two_terms=two_terms, cheb8=cheb8, g_cheb7=g_cheb7)
+    elif ipdf==6:
         # asm=pars[46:56]
-        asm=pars[basis_pars.i_sm_min:basis_pars.i_sm_max].copy()
+        asm=pars[basis_pars.i_sm_min:basis_pars.i_sm_max]
         out=sm_msht(x,asm)
-    if ipdf==7:
+    elif ipdf==7:
         # adbub=pars[56:64]
-        adbub=pars[basis_pars.i_dbub_min:basis_pars.i_dbub_max].copy()
-        out=dbub_msht(x,adbub)
-    if ipdf==8:
+        adbub=pars[basis_pars.i_dbub_min:basis_pars.i_dbub_max]
+        out=dbub_msht(x,adbub, cheb8=cheb8)
+    elif ipdf==8:
         # fitcharm=pars[64:73]
-        fitcharm=pars[basis_pars.i_ch_min:basis_pars.i_ch_max].copy()
-        out=q_msht(x,fitcharm)
+        fitcharm=pars[basis_pars.i_ch_min:basis_pars.i_ch_max]
+        out=q_msht(x,fitcharm, cheb8=cheb8)
 
     return out
 
+@nb.njit
 def sm_msht(x,ain):
     asm=ain[0]
     delsm=ain[1]
@@ -553,8 +581,12 @@ def q_msht_lowx_norm(ain):
     out=aq*(1.+aqc1+aqc2+aqc3+aqc4+aqc5+aqc6)
 
     return out
-    
-def q_msht(x,ain):
+
+@nb.njit
+def q_msht(x, ain, cheb8: bool = False):
+    """Compute a quark using the MSHT basis given the set of parameters ``ain``.
+    If cheb_8 is True, uses 8 cheb. polynomials instead of 6
+    """
     aq=ain[0]
     delq=ain[1]
     etaq=ain[2]
@@ -566,12 +598,11 @@ def q_msht(x,ain):
     aqc6=ain[8]
 
     if aq < 1e-20:
-        out=aq
-    else:   
-        # print(aq,etaq,delq)
-        out=aq*np.power(1.-x,etaq)*np.power(x,delq)*(1.+aqc1*cheb_msht(1,x)+aqc2*cheb_msht(2,x)+aqc3*cheb_msht(3,x)+aqc4*cheb_msht(4,x)+aqc5*cheb_msht(5,x)+aqc6*cheb_msht(6,x))
+        return aq
 
-    if basis_pars.Cheb_8:
+    out=aq*np.power(1.-x,etaq)*np.power(x,delq)*(1.+aqc1*cheb_msht(1,x)+aqc2*cheb_msht(2,x)+aqc3*cheb_msht(3,x)+aqc4*cheb_msht(4,x)+aqc5*cheb_msht(5,x)+aqc6*cheb_msht(6,x))
+
+    if cheb8:
         aqc7=ain[9]
         aqc8=ain[10]
         out+=aq*np.power(1.-x,etaq)*np.power(x,delq)*(aqc7*cheb_msht(7,x)+aqc8*cheb_msht(8,x))
@@ -622,7 +653,11 @@ def lg2_msht(x,ain):
     
     return out
 
-def g_msht(x,ain):
+@nb.njit
+def g_msht(x, ain, two_terms = False, g_cheb7 = False, cheb8 = False):
+    """Compute the MSHT gluon at point x given the set of
+    10 parameters ``ain``
+    """
     agp=ain[0]
     etagp=ain[1]
     delgp=ain[2]
@@ -634,26 +669,26 @@ def g_msht(x,ain):
     etagm=ain[8]
     delgm=ain[9]
 
-
-    if(basis_pars.g_second_term):
+    if two_terms:
         out=agp*np.power(1.-x,etagp)*np.power(x,delgp)*(1.+agc1*cheb_msht(1,x)+agc2*cheb_msht(2,x)+agc3*cheb_msht(3,x)+agc4*cheb_msht(4,x))
         out+=agm*np.power(1.-x,etagm)*np.power(x,delgm)
-        if basis_pars.Cheb_8:
+        if cheb8:
             agc5=ain[10]
             agc6=ain[11]
             out+=agp*np.power(1.-x,etagp)*np.power(x,delgp)*(agc5*cheb_msht(5,x)+agc6*cheb_msht(6,x))
     else:
         out=agp*np.power(1.-x,etagp)*np.power(x,delgp)*(1.+agc1*cheb_msht(1,x)+agc2*cheb_msht(2,x)+agc3*cheb_msht(3,x)+agc4*cheb_msht(4,x)+etagm*cheb_msht(5,x)+delgm*cheb_msht(6,x))
-        if(basis_pars.g_cheb7):
+        if g_cheb7: 
             out=out+agp*agm*cheb_msht(7,x)
-        if basis_pars.Cheb_8:
+        if cheb8:
             agc7=ain[10]
             agc8=ain[11]
             out+=agp*np.power(1.-x,etagp)*np.power(x,delgp)*(agc7*cheb_msht(7,x)+agc8*cheb_msht(8,x))
     return out
 
 
-def dbub_msht(xin,ain):
+@nb.njit
+def dbub_msht(xin,ain, cheb8=False):
     aq=ain[0]
     etaq=ain[1]
     aqc1=ain[2]
@@ -670,15 +705,20 @@ def dbub_msht(xin,ain):
     out=aq*np.power(1.-x,etaq)*(1.+aqc1*cheb_msht(1,x)+aqc2*cheb_msht(2,x)+aqc3*cheb_msht(3,x)+aqc4*cheb_msht(4,x)+aqc5*cheb_msht(5,x)+aqc6*cheb_msht(6,x))
 
 
-    if basis_pars.Cheb_8:
+    if cheb8:
         aqc7=ain[8]
         aqc8=ain[9]
         out+=aq*np.power(1.-x,etaq)*(aqc7*cheb_msht(7,x)+aqc8*cheb_msht(8,x))
 
     return out
 
-def cheb_msht(i,x):
+@nb.njit
+def cheb_msht(i, x):
+    """Returnts the i-th Chebyshev polynomial evaluated at
+        y = 1 - 2*sqrt(x)
+    """
     y=1.-2.*np.sqrt(x)
+    # TODO: probably makes sense to use numpy's chebyshev polynomial here?
     
     if i==1:
         out=y
@@ -701,24 +741,13 @@ def cheb_msht(i,x):
 
 def smin_norm(asm):
 
-#    xmin=1.0E-15
-#    xmax=0.99
-#    lxmin=np.log(xmin)
-#    lxmax=np.log(xmax)
-
-#    i1=quadrature(sm1_msht,lxmin,lxmax,args=(asm,),rtol=1.0e-04,maxiter=50)
-#    int1=i1[0]
-#    i2=quadrature(sm2_msht,lxmin,lxmax,args=(asm,),rtol=1.0e-04,maxiter=50)
-#    int2=i2[0]
-
     int1=sm1_int(asm,0.)
     int2=sm2_int(asm,0.)
 
-#    print('test',i1[0],i2[0],i1t,i2t)
-    
     out=int2/int1
     return out
 
+@nb.njit
 def sm1_int(ain,xmin):
 
     asm=ain[0]
@@ -739,6 +768,7 @@ def sm1_int(ain,xmin):
 
     return i1t
 
+@nb.njit
 def sm2_int(ain,xmin):
 
     asm=ain[0]
@@ -760,25 +790,19 @@ def sm2_int(ain,xmin):
 
     return i1t
 
-def qv_norm(iq,aq):
+@nb.njit
+def qv_norm(iq,aq, cheb8 = False):
+    i1=qv_int(aq,1,0., cheb8=cheb8)
 
-#    xmin=1.0E-9
-#    xmax=0.99
-#    lxmin=np.log(xmin)
-#    lxmax=np.log(xmax)
-#    i1t=quadrature(lq_msht,lxmin,lxmax,args=(aq,),rtol=1.0e-03,maxiter=50)
-    
-    i1=qv_int(aq,1,0.)
-
-    
     if iq==1: #uv
         out=2./i1
-    if iq==2: #dv
+    elif iq==2: #dv
         out=1./i1
         
     return out
-    
-def qv_int(aq,iq,xmin):
+  
+@nb.njit
+def qv_int(aq,iq,xmin, cheb8 = False):
 
     if iq==1:
         delq=aq[1]-1.
@@ -795,7 +819,7 @@ def qv_int(aq,iq,xmin):
     i1t=I(delq,etaq,xmin)+aqc1*Ic1(delq,etaq,xmin)+aqc2*Ic2(delq,etaq,xmin)+aqc3*Ic3(delq,etaq,xmin)+aqc4*Ic4(delq,etaq,xmin)
     i1t=i1t+aqc5*Ic5(delq,etaq,xmin)+aqc6*Ic6(delq,etaq,xmin)
 
-    if basis_pars.Cheb_8:
+    if cheb8:
         aqc7=aq[9]
         aqc8=aq[10]
         i1t+=aqc7*Ic7(delq,etaq,xmin)+aqc8*Ic8(delq,etaq,xmin)
@@ -805,7 +829,6 @@ def qv_int(aq,iq,xmin):
     return i1t
 
 def msum_ag(pars):
-
 
 #    xmin=1.0E-15
 #    xmax=0.99
@@ -835,10 +858,8 @@ def msum_ag(pars):
 
     xmin=0.
 
-
-    outng=qv_int(auv,2,xmin)+qv_int(adv,2,xmin)+qv_int(asea,2,xmin)+qv_int(fitcharm,2,xmin)
-
-    
+    c8 = basis_pars.Cheb_8
+    outng=qv_int(auv,2,xmin,c8)+qv_int(adv,2,xmin, c8)+qv_int(asea,2,xmin, c8)+qv_int(fitcharm,2,xmin, c8)
 
     # outng=0.66336
     # outng=0.67364
@@ -856,12 +877,10 @@ def msum_ag(pars):
     # # fch cheb 5    
     # outng=0.608941296908194
 
-    outg1=int_g1_msht(ag,xmin)
-    outg2=int_g2_msht(ag,xmin)
-
+    outg1=int_g1_msht(ag,xmin, two_terms=basis_pars.g_second_term, cheb8=c8, g_cheb7 = basis_pars.g_cheb7)
+    outg2=int_g2_msht(ag,xmin, two_terms=basis_pars.g_second_term)
 
     # outng=auv[1]
- 
 
     # print(qv_int(auv,2,xmin),qv_int(adv,2,xmin),qv_int(asea,2,xmin),qv_int(afitcharm,2,xmin))
     # print(outng)
@@ -883,8 +902,8 @@ def msum_ag(pars):
 
     return out
 
-def int_g1_msht(ain,xmin):
-
+@nb.njit
+def int_g1_msht(ain, xmin, two_terms = False, g_cheb7 = False, cheb8 = False):
     agp=ain[0]
     etagp=ain[1]
     delgp=ain[2]
@@ -896,17 +915,17 @@ def int_g1_msht(ain,xmin):
     etagm=ain[8]
     delgm=ain[9]
 
-    if(basis_pars.g_second_term):
+    if two_terms:
         out=I(delgp,etagp,xmin)+agc1*Ic1(delgp,etagp,xmin)+agc2*Ic2(delgp,etagp,xmin)+agc3*Ic3(delgp,etagp,xmin)+agc4*Ic4(delgp,etagp,xmin)
-        if basis_pars.Cheb_8:
+        if cheb8:
             agc5=ain[10]
             agc6=ain[11]
             out+=agc5*Ic5(delgp,etagp,xmin)+agc6*Ic6(delgp,etagp,xmin)
     else:
         out=I(delgp,etagp,xmin)+agc1*Ic1(delgp,etagp,xmin)+agc2*Ic2(delgp,etagp,xmin)+agc3*Ic3(delgp,etagp,xmin)+agc4*Ic4(delgp,etagp,xmin)+etagm*Ic5(delgp,etagp,xmin)+delgm*Ic6(delgp,etagp,xmin)
-        if(basis_pars.g_cheb7):
+        if g_cheb7:
             out=out+agm*Ic7(delgp,etagp,xmin)
-        if basis_pars.Cheb_8:
+        if cheb8:
             agc7=ain[10]
             agc8=ain[11]
             out+=agc7*Ic7(delgp,etagp,xmin)+agc8*Ic8(delgp,etagp,xmin)
@@ -915,34 +934,23 @@ def int_g1_msht(ain,xmin):
 
     return out
 
-def int_g2_msht(ain,xmin):
+@nb.njit
+def int_g2_msht(ain,xmin, two_terms=False):
 
-    agp=ain[0]
-    etagp=ain[1]
-    delgp=ain[2]
-    agc1=ain[3]
-    agc2=ain[4]
-    agc3=ain[5]
-    agc4=ain[6]
+    if not two_terms:
+        return 0.0
+
     agm=ain[7]
     etagm=ain[8]
     delgm=ain[9]
 
-    
-    if(basis_pars.g_second_term):
-        out=agm*I(delgm,etagm,xmin)
-    else:
-        out=0.
-
-
-    return out
+    return agm*I(delgm,etagm,xmin)
 
 
 
 def sumrules(parin):
     """
     Modify the set of input parameters so that the sum rules are fulfilled"""
-    
     out=parin.copy()
 
     # asm=out[46:56]
@@ -976,47 +984,15 @@ def sumrules(parin):
     # out[49]=x0
     out[basis_pars.i_sm_min+3]=x0
 
-    out[0]=qv_norm(1,auv)
+    out[0]=qv_norm(1,auv, cheb8 = basis_pars.Cheb_8)
     # print('out0 =',out[0])
     # out[9]=qv_norm(2,adv)
-    out[basis_pars.i_dv_min]=qv_norm(2,adv)
+    out[basis_pars.i_dv_min]=qv_norm(2,adv, cheb8=basis_pars.Cheb_8)
     
     ag=msum_ag(out)
 
     # out[36]=ag
     out[basis_pars.i_g_min]=ag
-
-
-    # xmin=1.0E-50
-    # xmax=1.0E-12
-    # xmin=1.0E-9
-    # xmax=0.999
-    # lxmin=np.log(xmin)
-    # lxmax=np.log(xmax)
-
-
-    # agpar=out[basis_pars.i_g_min:basis_pars.i_g_max]
-    # i2=quadrature(lg1_msht,lxmin,lxmax,args=(agpar,),rtol=1.0e-04,maxiter=50)
-    # outg1=i2[0]
-
-    # i3=quadrature(lg2_msht,lxmin,lxmax,args=(agpar,),rtol=1.0e-04,maxiter=50)
-    # outg2=i3[0]
-
-    # print(outg1,outg2,outg1+outg2)
-
-    # outg1=int_g1_msht(agpar,xmin)
-    # outg2=int_g2_msht(agpar,xmin)
-
-    # print(outg1,outg2,outg1+outg2)
-
-    # exit()
-
-    # agarr=out[36:46].copy()
-    # test=g_msht(1e-1,agarr)
-
-    # print('g(1e-1,1) = ',test)
-    # exit()
-
 
     return out
 

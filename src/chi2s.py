@@ -1,6 +1,5 @@
 from global_pars import *
 import functools
-from validphys.api import API
 import scipy.linalg as la
 from data_theory import *
 from validphys.calcutils import calc_chi2
@@ -20,34 +19,8 @@ def xgrid_calc():
 
     xgridtot=[]
 
-    
-
     for i in range (0,76):
-        # dataset_testii=fit_pars.dataset_40[i]                                                                                
-        # inptt = {                                                                                                                 
-        #     "dataset_input": dataset_testii,                                                                                      
-        #     "use_cuts": "internal",                                                                                               
-        #     "theoryid": fit_pars.theoryidi,                                                                                    
-        # }   
-
-        # dnam=str(API.dataset(**inptt))
-
-        # if fit_pars.cftrue[i]:
-        #     cfaci=API.cfac(**dataset_testii)
-
-        # if fit_pars.cftrue[i]:
-        #     ds = load_nnpdf.l.check_dataset(dnam, theoryid=fit_pars.theoryidi, cfac=cfaci)
-        # else:
-        #     ds = load_nnpdf.l.check_dataset(dnam, theoryid=fit_pars.theoryidi)
-
-        # cuts = ds.cuts.load()
-        # table=load_fktable(ds.fkspecs[0]).with_cuts(cuts)
-        # print(i,table.xgrid)
-
         output='input/xarr/grid'+str(i)+'.dat'
-        
-        # with open(output,'w') as outputfile:
-        #     np.savetxt(outputfile,table.xgrid,fmt="%.14E",delimiter=' ', newline=' ')
 
         inputfile=output
         xcheck=np.loadtxt(inputfile)
@@ -56,13 +29,7 @@ def xgrid_calc():
         xgridtot=np.append(xgridtot,xcheck)
         # xgridtot=np.append(xgridtot,table.xgrid)
         xgridtot=np.sort(xgridtot)
-        # print(len(xgridtot))
-        # print(xgridtot)
-        # print('')
 
-    # print(len(xgridtot))
-    # print(len(np.unique(xgridtot)))
-    # exit()
     xgridtot=np.unique(xgridtot)
 
     return xgridtot
@@ -607,39 +574,12 @@ def chi2corr_ind_group(imin,imax):
     return (out,chi2_pars.ndat)
 
 def chi2corr_lab(i):
-
-    dscomb=[fit_pars.dataset_40[i]]
-    dataset_testii=fit_pars.dataset_40[i]                                                                                
-
-    inptt = {                                                                                                                 
-        "dataset_input": dataset_testii,                                                                                      
-        "use_cuts": "internal",                                                                                               
-        "theoryid": fit_pars.theoryidi,                                                                                    
-    } 
-
-    dlabel=API.dataset(**inptt)
-
-    return dlabel
+    """Return dataset index i from the share data"""
+    return shared_global_data["data"].datasets[i]
 
 def chi2corr_ind(i):
-
-
-    dscomb=[fit_pars.dataset_40[i]]
-    dataset_testii=fit_pars.dataset_40[i]                                                                                
-
-    inptt = {                                                                                                                 
-        "dataset_input": dataset_testii,                                                                                      
-        "use_cuts": "internal",                                                                                               
-        "theoryid": fit_pars.theoryidi,                                                                                    
-    } 
-
-    dlabel=API.dataset(**inptt)
-
-    # theory=theory_calc(i,dataset_testii,inptt,fit_pars.cftrue[i])
-
-    # dattot=dat_calc_rep(dscomb,cov)
-    # lcd = API.loaded_commondata_with_cuts(dataset_input=dataset_testii,theoryid=fit_pars.theoryidi,use_cuts='internal')
-    # cval=lcd.central_values
+    """Compute chi2 for a single dataset"""
+    dlabel =fit_pars.dataset_40[i]                                                                                
 
     if(chi2_pars.t0):
         # inpt0 = dict(dataset_inputs=dscomb, theoryid=fit_pars.theoryidi, use_cuts="internal", t0pdfset=pdf_pars.PDFlabel, use_t0=True)
@@ -655,21 +595,12 @@ def chi2corr_ind(i):
     cov_ind=cov_gl[chi2_pars.idat_low_arr[i]:chi2_pars.idat_up_arr[i],chi2_pars.idat_low_arr[i]:chi2_pars.idat_up_arr[i]]
     cov=cov_ind
     cov_inv=la.inv(cov)
-    # cov_inv=covin_gl[chi2_pars.idat_low_arr[i]:chi2_pars.idat_up_arr[i],chi2_pars.idat_low_arr[i]:chi2_pars.idat_up_arr[i]]
-
 
     theory=dload_pars.tharr_gl[chi2_pars.idat_low_arr[i]:chi2_pars.idat_up_arr[i]]
-
-    # print(theory)
-
-    # dattot=dat_calc_rep(dscomb,cov)
     dattot=dload_pars.darr_gl[chi2_pars.idat_low_arr[i]:chi2_pars.idat_up_arr[i]]
-
-
     ndat=len(dattot)
 
     diffs=np.array(dattot-theory)
-    # out=calc_chi2(la.cholesky(cov, lower=True), diffs)
     out=diffs@cov_inv@diffs
 
     return (out,ndat,dlabel)
@@ -687,9 +618,6 @@ def chi2corr_global(imin, imax, vp_pdf=None, theta_idx=None):
 
     din=[fit_pars.dataset_40[imin]]
 
-    # print('CHI2CORR')
-
-
     if dload_pars.dflag==1:
         # print('DLOAD')
         for i in range(imin+1,imax+1):
@@ -697,48 +625,6 @@ def chi2corr_global(imin, imax, vp_pdf=None, theta_idx=None):
             # print(i,fit_pars.dataset_40[i])
         dload_pars.dscomb=din
 
-#   TEST
-
-    # din_nlo=[fit_pars.dataset_40_nlo[imin]]
-
-    # if dload_pars.dflag==1:
-    #     # print('DLOAD')
-    #     for i in range(imin+1,imax+1):
-    #         din_nlo.append(fit_pars.dataset_40_nlo[i])
-    #         # print(i,fit_pars.dataset_40[i])
-    #     dload_pars.dscomb_nlo=din_nlo
-
-#  END TEST
-
-    # if(chi2_pars.t0):
-    #     print('t0 cov...')
-    #     inpt0 = dict(dataset_inputs=dload_pars.dscomb, theoryid=fit_pars.theoryidi, use_cuts="internal", t0pdfset=pdf_pars.PDFlabel, use_t0=True)
-    #     cov = API.dataset_inputs_t0_covmat_from_systematics(**inpt0)
-    #     covin=la.inv(cov)
-    #     print('...finish')
-    # else:
-    #     if chi2_pars.t0_noderiv:
-    #         if dload_pars.dcov==1:
-    #             print('t0 cov...')
-    #             inpt0 = dict(dataset_inputs=dload_pars.dscomb, theoryid=fit_pars.theoryidi, use_cuts="internal", t0pdfset=pdf_pars.PDFlabel, use_t0=True)
-    #             cov = API.dataset_inputs_t0_covmat_from_systematics(**inpt0)
-    #             covin=la.inv(cov)
-    #             dload_pars.covt0=cov
-    #             dload_pars.covt0_inv=covin
-    #             print('...finish')
-    #     else:
-    #         if dload_pars.dflag==1:
-    #             print('exp cov...')
-    #             # lcd = API.dataset_inputs_loaded_cd_with_cuts(dataset_inputs=dload_pars.dscomb,theoryid=fit_pars.theoryidi,use_cuts='internal')
-    #             # covtest=dataset_inputs_covmat_from_systematics(lcd,dload_pars.dscomb)
-    #             inp = dict(dataset_inputs=dload_pars.dscomb, theoryid=fit_pars.theoryidi, use_cuts="internal")
-    #             cov = API.dataset_inputs_covmat_from_systematics(**inp) 
-    #             covin=la.inv(cov)
-    #             dload_pars.covexp=cov
-    #             dload_pars.covexp_inv=covin
-    #             print('...finish')
-        
-    
     dload_pars.ifk=0
     if dload_pars.dflag==1:
         chi2_pars.idat=0
@@ -755,117 +641,39 @@ def chi2corr_global(imin, imax, vp_pdf=None, theta_idx=None):
     vp_input = {"use_cuts": "internal", "theoryid": fit_pars.theoryidi}
     if vp_pdf is not None:
         vp_input["pdf"] = vp_pdf
-    all_ds_input = []
+    theorytot = []
 
     for i in range(imin,imax+1):
-        dataset_testii=fit_pars.dataset_40[i]  
+        ds = shared_global_data["data"].datasets[i]
+        dataset_testii=fit_pars.dataset_40[i]
 
-        inptt = {**vp_input, "dataset_input": dataset_testii}
-        all_ds_input.append(dataset_testii)
-
-        # if fit_pars.nlo_cuts:
-        #     # inptt = {                          
-        #     #     "cuts_intersection_spec": [{"theoryid": 212, "theoryid": 211}],                                                                                      
-        #     #     "dataset_input": dataset_testii,                                                                                      
-        #     #     "use_cuts": "fromintersection",                                                                                               
-        #     #     "theoryid": fit_pars.theoryidi,                                                                                    
-        #     # }    
-        #     intersection_i=[{"dataset_input": dataset_testii, "theoryid": 212},{"dataset_input": dataset_testii, "theoryid": 212}]
-        #     inptt = {                          
-        #         "cuts_intersection_spec": intersection_i,                                                                                      
-        #         "dataset_input": dataset_testii,                                                                                      
-        #         "use_cuts": 'nocuts',                                                                                               
-        #         "theoryid": fit_pars.theoryidi,                                                                    
-        #     }    
-        # else:
-        # # print('theory - ', i)                                                                             
-        #     inptt = {                                                                                                                 
-        #         "dataset_input": dataset_testii,                                                                                      
-        #         "use_cuts": "internal",                                                                                               
-        #         "theoryid": fit_pars.theoryidi,                                                                         
-        #     }    
-        
         if vp_pdf is not None and theta_idx is not None:
             # computing derivative of th prediction wrt free parameter theta_idx
-            theory = vp_pdf.derivative_th_predictions("internal", fit_pars.theoryidi, dataset_testii, theta_idx)
+            theory = vp_pdf.derivative_th_predictions(ds, theta_idx)
         elif vp_pdf is not None:
             # computing central value of th prediction.
             # In order to use this aslo to compute the derivative we need to modify vp API allowing central_predictions to take 2 pdfs as input
-            theory = API.central_predictions(**inptt).values[:,0]
+            theory = central_predictions(ds, vp_pdf).values[:,0]
         else:
+            raise Exception
             theory=theory_calc(i,dataset_testii,inptt,fit_pars.cftrue[i])
 
         fit_pars.preds_stored[str(dataset_testii["dataset"])]=theory
-
-        # for j in range (0,len(theory)):
-        #     outputfile_label.write(str(i))
-        #     outputfile_label.write('\n')
-
-        # if inout_pars.pdout:
-        #     renorm_cent=1.0
-        #     renorm_err=0.03
-        #     renorm=renorm_cent+np.random.normal()*renorm_err
-        #     theory_renorm=theory*renorm
-        #     theory=theory_renorm
-
 
         if dload_pars.dflag==1:
             chi2_pars.idat_low_arr[i]=chi2_pars.idat
             chi2_pars.idat+=len(theory)
             chi2_pars.idat_up_arr[i]=chi2_pars.idat
 
-        # print('theory1 - ', i)
-        if i==imin:
-            theorytot=np.array(theory)
-        else:
-            theorytoti=np.concatenate((theorytot,theory))
-            theorytot=theorytoti
-     
+        theorytot.append(theory)
 
-    # print(chi2_pars.idat_low_arr)
-    # print(len())
-
-
-
-    # os.quit()
-    # dattot=dat_calc_rep(dload_pars.dscomb,cov)
-    # chi2_pars.ndat=len(dattot)
-
-    # print(theorytot)
-    # theorytot_save=theorytot
-
-    # input_theory="test.dat"
-    # theorytot_test=np.loadtxt(input_theory)
-
-    # theorytot=theorytot_test
-    # fit_pars.preds_stored[str(dataset_testii["dataset"])]=theorytot_test
-
-    # with np.printoptions(threshold=np.inf):
-    #     print(np.array(theorytot))
-    #     print('')
-    #     print(theorytot_test)
-    #     print('')
-    #     print(np.array((theorytot-theorytot_test)/theorytot))
-
-    # for i in range(0,len(theorytot)):
-    #     print(i,theorytot[i],theorytot_test[i],(theorytot[i]-theorytot_test[i])/theorytot[i])
-    # os.quit()
-
-
-
-    # theorytot=np.array([7.331231e+02, 5.521901e+02, 3.085514e+02, 1.164292e+02, 2.634233e+01, 4.181861e+02, 3.628424e+02, 2.879468e+02, 1.862870e+02, 8.468742e+01])
-
-
-    # print(dattot) 
-    # os.quit()
-    # print(len(theorytot))
-    # exit()
+    theorytot = np.concatenate(theorytot)
 
     if vp_pdf is not None:
         # Get the covmat for all the dataset we have calculated chi2 for. The order is the same as the vector of theories
         # TODO: eventually we'll try to skip it and compute the chi2 directly
         # TODO: in principle nlo intersenction cut should already be part of vp_input at this stage
-        cov = API.dataset_inputs_covmat_t0_considered(**vp_input, dataset_inputs = all_ds_input, use_t0=chi2_pars.t0, t0pdfset=vp_pdf)
+        cov = shared_global_data["data"].produce_covmat(vp_pdf, imin, imax+1, use_t0=chi2_pars.t0)
         covin = la.inv(cov)
 
         if chi2_pars.t0:
@@ -875,41 +683,33 @@ def chi2corr_global(imin, imax, vp_pdf=None, theta_idx=None):
             # LHL ADDED NEW - so that t0 def is used in minimisation
         elif chi2_pars.t0_noderiv: 
             if dload_pars.dcov==1:
+                print("Computing t0 cov...", end="")
                 try:
                     # cov = API.dataset_inputs_t0_covmat_from_systematics(**inpt0)
-                    cov = API.dataset_inputs_covmat_t0_considered(**vp_input, dataset_inputs = all_ds_input, use_t0=True, t0pdfset=vp_pdf)
+                    cov = shared_global_data["data"].produce_covmat(vp_pdf, imin, imax+1, use_t0=True)
                     covin=la.inv(cov)
                 except (la.LinAlgError,ValueError) as err:
                     print('t0 cov may be ill behaved, trying exp cov instead...')
-                    cov=dload_pars.covexp
-                    covin=dload_pars.covexp_inv
-                print('t0 cov2...')
-                # cov = API.dataset_inputs_covmat_t0_considered(**vp_input, dataset_inputs = all_ds_input, use_t0=True, t0pdfset=vp_pdf)
-                # # print(cov)
-                # covin = la.inv(cov)
+                    cov = shared_global_data["data"].produce_covmat(imin, imax+1)
+                    covin= la.inv(cov)
+
+                # TODO: these two variables can be removed?
                 dload_pars.covt0=cov
                 dload_pars.covt0_inv=covin
-                print('...finish')    
+                print('...finished')    
                 dload_pars.dcov=0
         else:
             dload_pars.covexp=cov
             dload_pars.covexp_inv=covin
 
     elif(chi2_pars.t0):
+        raise Exception("never")
         print('t0 cov1...')
         if fit_pars.nlo_cuts:
             inpt0 = dict(dataset_inputs=dload_pars.dscomb, theoryid=fit_pars.theoryidi, use_cuts="fromintersection", cuts_intersection_spec=intersection, t0pdfset=pdf_pars.PDFlabel, use_t0=True)
         else:   
             inpt0 = dict(dataset_inputs=dload_pars.dscomb, theoryid=fit_pars.theoryidi, use_cuts="internal", t0pdfset=pdf_pars.PDFlabel, use_t0=True)
         try:
-            # lcd = API.dataset_inputs_loaded_cd_with_cuts(dataset_inputs=dload_pars.dscomb,theoryid=fit_pars.theoryidi,use_cuts='internal')
-            # covtest=dataset_inputs_t0_covmat_from_systematics(lcd)
-            # preds=API.dataset_inputs_t0_predictions(**inpt0)
-
-            # print(dload_pars.dscomb)
-            # print(dload_pars.dscomb[0]["dataset"])
-
-            # cov = API.dataset_inputs_t0_covmat_from_systematics(**inpt0)
             print(pdf_pars.PDFlabel)
             cov = calc_covmat_t0(inpt0)
             
@@ -926,6 +726,7 @@ def chi2corr_global(imin, imax, vp_pdf=None, theta_idx=None):
         dload_pars.covt0_inv=covin
         print('...finish')
     else:
+        raise Exception("Never")
         if chi2_pars.t0_noderiv:
             if dload_pars.dcov==1:
                 print('t0 cov2...')
@@ -934,7 +735,6 @@ def chi2corr_global(imin, imax, vp_pdf=None, theta_idx=None):
                 else:   
                     inpt0 = dict(dataset_inputs=dload_pars.dscomb, theoryid=fit_pars.theoryidi, use_cuts="internal", t0pdfset=pdf_pars.PDFlabel, use_t0=True)
                 try:
-                    # cov = API.dataset_inputs_t0_covmat_from_systematics(**inpt0)
                     cov = calc_covmat_t0(inpt0)
                     covin=la.inv(cov)
                 except la.LinAlgError as err:
@@ -948,12 +748,6 @@ def chi2corr_global(imin, imax, vp_pdf=None, theta_idx=None):
         else:
             if dload_pars.dflag==1:
                 print('exp cov...')
-                # lcd = API.dataset_inputs_loaded_cd_with_cuts(dataset_inputs=dload_pars.dscomb,theoryid=fit_pars.theoryidi,use_cuts='internal')
-                # covtest=dataset_inputs_covmat_from_systematics(lcd,dload_pars.dscomb)
-                # if inout_pars.pdout:
-                #     inp = dict(dataset_inputs=dload_pars.dscomb, theoryid=fit_pars.theoryidi, use_cuts="internal")
-                # else:   
-                #     inp = dict(dataset_inputs=dload_pars.dscomb, theoryid=fit_pars.theoryidi, use_cuts="internal")
                 if fit_pars.nlo_cuts:
                     print('NLO CUTS')
                     inp = dict(dataset_inputs=dload_pars.dscomb, theoryid=fit_pars.theoryidi, use_cuts="fromintersection", cuts_intersection_spec=intersection)
@@ -968,12 +762,11 @@ def chi2corr_global(imin, imax, vp_pdf=None, theta_idx=None):
     if dload_pars.dflag==1:
 
         print('DLOAD')
-
         if fit_pars.pseud:
             fit_pars.pseud=False
-            dattot0=dat_calc_rep(dload_pars.dscomb,cov)
+            dattot0=dat_calc_rep(dload_pars.dscomb, genrep = False)
             fit_pars.pseud=True
-            dattot=dat_calc_rep(dload_pars.dscomb,cov)
+            dattot=dat_calc_rep(dload_pars.dscomb,cov, genrep = True)
         else:  
             dattot=dat_calc_rep(dload_pars.dscomb,cov)
         chi2_pars.ndat=len(dattot)
@@ -984,58 +777,18 @@ def chi2corr_global(imin, imax, vp_pdf=None, theta_idx=None):
         print('NO DLOAD')
 
         dattot=dload_pars.darr_gl
-        if chi2_pars.t0_noderiv:
-            cov=dload_pars.covt0
-            covin=dload_pars.covt0_inv
-        elif not chi2_pars.t0:
-            cov=dload_pars.covexp
-            covin=dload_pars.covexp_inv
+
+        # TODO At this point, cov and covin _should_ already have the right values
+        # this should be removed
+#         if chi2_pars.t0_noderiv:
+#             cov=dload_pars.covt0
+#             covin=dload_pars.covt0_inv
+#         elif not chi2_pars.t0:
+#             cov=dload_pars.covexp
+#             covin=dload_pars.covexp_inv
 
     if inout_pars.pdout:
         outputfile=open('outputs/pseudodata/'+pdf_closure.pdlabel+'.dat','w')
-
-        # outputcov='outputs/pseudodata/cov.dat'
-        # print(len(cov))
-        # print(cov)
-
-        # # for icov in range(0,len(cov)):
-        # #     # print(cov[:,icov])
-        # #     
-        # with open(outputcov,'w') as outputf:
-        #     np.savetxt(outputf,cov,fmt="%.7E",delimiter=' ', newline='\n')
-        #     # outputfile.write('\n')
-
-        # os.quit()
-
-        # if(pdf_closure.pdfscat):
-            
-            # cov=np.diag(np.diag(cov))
-            # covin=la.inv(cov)
-
-            # test=la.cholesky(cov)
-            # print(test)
-
-            # print(np.all(la.eigvals(cov) > 0))
-
-            # exit()
-
-            # for i in range(0,len(cov)):
-            #     print(i,cov[i,i])
-
-            # lam,eig = la.eigh(covin)
-            # cov_d=la.inv(eig)@covin@eig
-
-            # theorytot_d=la.inv(eig)@theorytot
-
-            # for i in range(0,len(cov)):
-            #     theorytot_d[i]=theorytot_d[i]+np.random.normal()*np.sqrt(1./cov_d[i,i])
-
-            # theorytot=eig@theorytot_d
-
-            # replace with numpy version...!!!doesn't currently work!!
-
-            # theorytot=multivariate_normal(theorytot,cov, allow_singular=True).rvs()
-            # theorytot=rng.multivariate_normal(theorytot,cov)
 
 #       pseudodata calculate using internal NNPDF routing - shift defined wrt real data so redefine as wrt pseudodata
         if fit_pars.pseud: 
@@ -1074,12 +827,6 @@ def chi2corr_global(imin, imax, vp_pdf=None, theta_idx=None):
                 dload_pars.darr_gl=dattot
                 
         dload_pars.dflag=0
-        # dload_pars.dcov=0
-
-#            else:
-#                dattot=dat_calc_rep(dload_pars.dscomb,cov)
-#                dload_pars.dflag=0
-#                dload_pars.darr_gl=dattot
     else:
         dattot=dload_pars.darr_gl
 
@@ -1091,50 +838,6 @@ def chi2corr_global(imin, imax, vp_pdf=None, theta_idx=None):
 
     dattotr=2.*dattot-1.
     theorytotr=2.*theorytot-1.
-
-    # chitot=0.
-    # for i in range(fit_pars.imindat,fit_pars.imaxdat): 
-
-    #     (chi,nd,dlab)=chi2corr_ind(i)
-    #     print(i,dlab,chi)
-    #     # print(i,'  ',chi)
-    #     # print(nd)
-    #     chitot+=chi
-
-    # print(chitot)
-
-    # outputfile=open('outputs/pseudodata/40data.dat','w')
-    # for i in range (0,len(theorytot)):
-    #     outputfile.write(str(dattot[i]))
-    #     outputfile.write('\n')
-
-    # os.quit()
-
-    # print(theorytot)
-    # print(dattot) 
-    # print(cov)
-    # os.quit()
-
-
-
-# chi2(exp) in (no pos pen): 17.454979521323757 1.939442169035973
-# chi2(t0) in (no pos pen): 17.454979521323757 1.939442169035973
-
-    #    outputfile=open('outputs/nmc_nnpdf.dat','w')
-
-    #    for i in range (0,len(theorytot)):
-    #        outputfile.write('      ')
-    #        outputfile.write(str(theorytotr[i]))
-    #        outputfile.write('      ')
-    #        outputfile.write(str(dattotr[i]))
-    #        outputfile.write('\n')
-    
-    
-    #    inputfile='nmc_theory_MSHTfitNNPDF.dat'
-    
-    #    dist=np.loadtxt(inputfile)
-    #    dattotnr=dist[0:len(theorytot),3].flatten()
-    #    theorytotnr=dist[0:len(theorytot),4].flatten()
 
     if fit_pars.nmcpd_diag:
 
@@ -1150,21 +853,8 @@ def chi2corr_global(imin, imax, vp_pdf=None, theta_idx=None):
 
         cov=cov_d.copy()
 
-#    temp=np.identity(len(cov))
-#    cov_dt=cov*temp
-
-    # for i in range(0,len(diffs)):
-    #     if np.abs(diffs[i]) > 0.1:
-    #         print(i,diffs[i])
-
-    # exit()
-
-#    for i in range(0,chi2_pars.ndat-1):
-#        print(i,dattot[i],theorytot[i],np.sqrt(cov[i,i]),np.power(diffs[i],2)/cov[i,i])
-
     try:
-        # out=calc_chi2(la.cholesky(cov, lower=True), diffs)
-        out=diffs@covin@diffs
+        out= diffs@covin@diffs
     except la.LinAlgError as err:
         print(err)
         print('t0 cov may be ill behaved, trying exp cov instead...')
@@ -1199,14 +889,6 @@ def chi2corr_global(imin, imax, vp_pdf=None, theta_idx=None):
             print('No, theory ill behaved - set chi^2=1e50')
             out=1e50
             print('out=', out)
-
-#    out=theorytot[0]
-    
-#    pset_pdf = lhapdf.getPDFSet(pdf_pars.PDFlabel)
-#    lh_pdf = pset_pdf.mkPDFs()
-#    out=lh_pdf[0].xfxQ(3,0.01,np.sqrt(5.)) 
-
-
 
     return (out,theorytot,cov,covin,diffs)
 
@@ -2351,16 +2033,17 @@ def hess_zeros(hess):
     return hessd2
 
 def calc_covmat_t0(inpt0):
+    """Compute covmat given an object inpt0 containing, among other things, the dataset_inputs info.
 
-    lcd = API.dataset_inputs_loaded_cd_with_cuts(dataset_inputs=dload_pars.dscomb,theoryid=fit_pars.theoryidi,use_cuts='internal')
-    dtest=API.data_input(**inpt0)
+    Intersection cuts might be included in inpt0.
+    """
+    # TODO but are they being used?
+    if inpt0["use_cuts"] != "internal":
+        raise ValueError("intersection cuts not implemented at this point")
 
-    list_preds=list(fit_pars.preds_stored.keys())
-
-    preds=[]
-    for label in list_preds:
-        preds.append(np.array(fit_pars.preds_stored[label]))
-
-    cov = dataset_inputs_covmat_from_systematics(lcd,dtest,True,None,preds)
-
-    return cov
+    # TODO originally this code used dload_pars.dscomb for some stuff, inpt0 for other and the predictions from what was stored
+    # in the global state. Now it will use _only_ the inpt0, it should've always been compatible anyway.
+    dnames = [i["dataset"] for i in inpt0["dataset_inputs"]]
+    pdfset = inpt0["t0pdfset"]
+    use_t0 = inpt0["use_t0"]
+    return shared_global_data["data"].produce_covmat(pdf=pdfset, names=tuple(dnames), use_t0=use_t0)

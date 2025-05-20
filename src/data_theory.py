@@ -20,21 +20,27 @@ import functools
 from validphys.pdfbases import evolution
 import contextlib
 
-def dat_calc_rep(dscomb,cov):
+def dat_calc_rep(dscomb, cov = None, genrep=None):
+    """Given a list of datanames, produce the replica pseudodata.
+    """
+    dnames = tuple([i["dataset"] for i in dscomb])
+    if genrep is None:
+        genrep = fit_pars.pseud
+    return shared_global_data["data"].produce_replica(names=dnames, irep=fit_pars.irep, genrep=genrep)
 
-    if fit_pars.nlo_cuts:
-        intersection=[{"dataset_inputs": dload_pars.dscomb, "theoryid": 200}]
-        lcd = API.dataset_inputs_loaded_cd_with_cuts(dataset_inputs=dscomb,theoryid=fit_pars.theoryidi,use_cuts="fromintersection",cuts_intersection_spec=intersection)                          
-    else:
-        lcd = API.dataset_inputs_loaded_cd_with_cuts(dataset_inputs=dscomb,theoryid=fit_pars.theoryidi,use_cuts='internal')        
-    
-    if fit_pars.pseud:
-        dattot=make_replica(lcd,replica_mcseed=fit_pars.irep,dataset_inputs_sampling_covmat=cov,sep_mult=False,genrep=True)  
-    else:
-        dattot=make_replica(lcd,replica_mcseed=fit_pars.irep,dataset_inputs_sampling_covmat=cov,sep_mult=False,genrep=False)
-        
-
-    return(dattot)
+#     if fit_pars.nlo_cuts:
+#         intersection=[{"dataset_inputs": dload_pars.dscomb, "theoryid": 200}]
+#         lcd = API dataset_inputs_loaded_cd_with_cuts(dataset_inputs=dscomb,theoryid=fit_pars.theoryidi,use_cuts="fromintersection",cuts_intersection_spec=intersection)                          
+#     else:
+#         lcd = API dataset_inputs_loaded_cd_with_cuts(dataset_inputs=dscomb,theoryid=fit_pars.theoryidi,use_cuts='internal')        
+#     
+#     if fit_pars.pseud:
+#         dattot=make_replica(lcd,replica_mcseed=fit_pars.irep,dataset_inputs_sampling_covmat=cov,sep_mult=False,genrep=True)  
+#     else:
+#         dattot=make_replica(lcd,replica_mcseed=fit_pars.irep,dataset_inputs_sampling_covmat=cov,sep_mult=False,genrep=False)
+#         
+# 
+#     return(dattot)
 
 def del_pen(delta):
 
@@ -399,6 +405,7 @@ def central_fk_predictions_2pdfs(ds,loaded_fk, pdf1, pdf2=None, ifk=None):
         return central_dis_predictions(loaded_fk, pdf1)
 
 def theory_calc(i,dataset_testii,inpt,ctrue):
+    # TODO: not called?
 
     dnam=str(API.dataset(**inpt))
 
@@ -435,7 +442,6 @@ def preds_calc(ds,pdfin0,pdfin=None):
     return predarr
 
 def kin_out(inpt):
-
     cd = API.commondata(**inpt)
     lcd = load_commondata(cd)
     kin1=lcd.commondata_table["kin1"]
@@ -446,7 +452,6 @@ def kin_out(inpt):
 
 
 def theory_calc_def(i,dataset_testii,inpt,ctrue):
-
     # print(i)
     # print(dload_pars.fk_loadarr[i])
 

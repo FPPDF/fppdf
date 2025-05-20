@@ -1,8 +1,11 @@
 import numpy as np
 from validphys.loader import Loader
+import dataclasses
 
 DEBUG = False
 # TODO: The newmin parameter should always be true
+
+
 
 class load_nnpdf:
     l=Loader()
@@ -67,7 +70,7 @@ class chi2_pars:
     L0=False
 
 class basis_pars:
-    # If true then two term gluon parameterisation uesd
+    # If true then two term gluon parameterisation used
     g_second_term=False
     # if true and g_second_term=False then includes 7th Chebyshev for gluon
     g_cheb7=False
@@ -455,13 +458,13 @@ class fit_pars:
     {'dataset': 'LHCB_Z_13TEV_DIELECTRON', 'cfac': ['QCD']}]
 
     dataset_HERAonly=[{'dataset': 'HERACOMBNCEM'},
-    {'dataset': 'HERACOMBNCEP460'},
-    {'dataset': 'HERACOMBNCEP575'},
-    {'dataset': 'HERACOMBNCEP820'},
-    {'dataset': 'HERACOMBNCEP920'},
-    {'dataset': 'HERACOMBCCEM'},
-    {'dataset': 'HERACOMBCCEP'},
-    {'dataset': 'HERACOMB_SIGMARED_C'},
+#     {'dataset': 'HERACOMBNCEP460'},
+#     {'dataset': 'HERACOMBNCEP575'},
+#     {'dataset': 'HERACOMBNCEP820'},
+#     {'dataset': 'HERACOMBNCEP920'},
+#     {'dataset': 'HERACOMBCCEM'},
+#     {'dataset': 'HERACOMBCCEP'},
+#     {'dataset': 'HERACOMB_SIGMARED_C'},
     {'dataset': 'HERACOMB_SIGMARED_B'}]
 
     dataset_noLHC=[{'dataset': 'NMCPD_dw_ite'},
@@ -1011,3 +1014,100 @@ class Dummy:
 
     def __init__(*args, **kwargs):
         pass
+
+from validphys.api import API
+import dataclasses
+from functools import cache, cached_property
+from validphys.convolution import central_predictions
+from validphys.covmats import dataset_inputs_covmat_from_systematics
+from validphys.pseudodata import make_replica
+from nnpdf_data.validphys_compatibility import legacy_to_new_map
+
+def _sanitize(name):
+    """Sanitize old-version names"""
+    newname, _ = legacy_to_new_map(name)
+    return newname
+
+
+@cache
+def cached_central_predictions(ds, pdf):
+    # TODO: this caching can (and should) be lifted to validphys
+    return central_predictions(ds, pdf)
+
+# TODO: this is a temporary function to remove states and caches from the functions above
+@dataclasses.dataclass(frozen=True)
+class DataHolder:
+    """
+        Class holding all data fixed information.
+        At the moment it holds the data for the full possible set
+        and the separate functions will query what they need.
+
+        dataset:
+            list of NNPDF dataset objects
+    """
+    datasets: tuple
+    # NOTE: intersection cuts are being ignored, but should've been added upon construction
+
+    @cached_property
+    def _data_dict(self):
+        return {str(ds): ds for ds in self.datasets}
+
+    def select_datasets(self, names):
+        """Select datasets given a list of names"""
+        return [self._data_dict[_sanitize(n)] for n in names]
+
+    @cache
+    def produce_covmat(self, pdf=None, imin=None, imax=None, names=None, use_t0 = True):
+        """Produce the t0 covmat for the given PDF for the datasets.
+        Either by using imin-imax or by using a tuple of names.
+        """
+        central_values = None
+        if names is None and (imin is not None and imax is not None):
+            datasets = self.datasets[imin:imax]
+        else:
+            datasets = self.select_datasets(names=names)
+
+        if use_t0:
+            if pdf is None:
+                raise ValueError("PDF missing for t0")
+            if isinstance(pdf, str):
+                pdf = API.pdf(pdf=pdf)
+            central_values = [cached_central_predictions(ds, pdf).to_numpy().reshape(-1)  for ds in datasets]
+
+        cds = [ds.load_commondata() for ds in datasets]
+        covmat = dataset_inputs_covmat_from_systematics(cds, _list_of_central_values=central_values, use_weights_in_covmat=False)
+        return covmat
+
+    @cache
+    def produce_replica(self, names=None, irep=0, genrep=False):
+        """Produce the replica data given a tuple of datasets"""
+        datasets = self.select_datasets(names=names)
+
+        # Load the data
+        lcd = [i.load_commondata() for i in datasets]
+        covmat = self.produce_covmat(use_t0 = False, names=names)
+
+        return make_replica(lcd, irep, covmat, genrep = genrep)
+        
+
+        
+
+
+
+
+
+
+
+# Limite the shared global data to what's available in this dictionary
+shared_global_data = {
+    "data": None
+}
+
+def shared_populate_data():
+
+    datasets = []
+    for dinput in fit_pars.dataset_40:
+        ds = API.dataset(dataset_input=dinput, theoryid=fit_pars.theoryidi, use_cuts= "internal")
+        datasets.append(ds)
+
+    shared_global_data["data"] = DataHolder(tuple(datasets))
