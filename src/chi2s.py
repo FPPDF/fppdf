@@ -2061,6 +2061,15 @@ def jaccalc(label_arr,label_arrm,eps_arr,hess_calc):
 
     hessparr=np.zeros((pdf_pars.npar_free+1,pdf_pars.npar_free+1))
 
+    if fit_pars.pos_const:
+
+        for ip in range(1,pdf_pars.npar_free+1):
+
+            hessparr[ip,ip]=(chiarr[ip]-2.*chiarr[0]+chiarrm[ip])/np.power(eps_arr[ip],2)
+
+            chiarr[ip]=chiarr[ip]-chiarrm[ip]
+            chiarr[ip]=chiarr[ip]/eps_arr[ip]/2.
+
     chiarr=np.delete(chiarr,0)
 
     hessparr=np.delete(hessparr,0,0)
