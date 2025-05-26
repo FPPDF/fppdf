@@ -33,7 +33,7 @@ class chi2_pars:
     # when calculating jacobian take also derivative of covariance matrix (needs uset0cov=True)
     jac_b=False
     # take two step derivative for chi^2 minimisation
-    diff_2=True
+    diff_2=False # Can be assumed as always false
     # take four step derivative for chi^2 minimisation
     diff_4=False
     # number of data points - set in code
@@ -1015,6 +1015,7 @@ class Dummy:
     def __init__(*args, **kwargs):
         pass
 
+
 from validphys.api import API
 import dataclasses
 from functools import cache, cached_property
@@ -1022,6 +1023,7 @@ from validphys.convolution import central_predictions
 from validphys.covmats import dataset_inputs_covmat_from_systematics
 from validphys.pseudodata import make_replica
 from nnpdf_data.validphys_compatibility import legacy_to_new_map
+
 
 def _sanitize(name):
     """Sanitize old-version names"""
@@ -1034,17 +1036,19 @@ def cached_central_predictions(ds, pdf):
     # TODO: this caching can (and should) be lifted to validphys
     return central_predictions(ds, pdf)
 
+
 # TODO: this is a temporary function to remove states and caches from the functions above
 @dataclasses.dataclass(frozen=True)
 class DataHolder:
     """
-        Class holding all data fixed information.
-        At the moment it holds the data for the full possible set
-        and the separate functions will query what they need.
+    Class holding all data fixed information.
+    At the moment it holds the data for the full possible set
+    and the separate functions will query what they need.
 
-        dataset:
-            list of NNPDF dataset DataSetSpec objects
+    dataset:
+        list of NNPDF dataset DataSetSpec objects
     """
+
     datasets: tuple
     # NOTE: intersection cuts are being ignored, but should've been added upon construction
 
@@ -1052,49 +1056,57 @@ class DataHolder:
     def _data_dict(self):
         return {str(ds): ds for ds in self.datasets}
 
+    @cache
     def select_dataset(self, name):
         """Select dataset by name"""
         return self._data_dict[_sanitize(name)]
 
+    @cache
     def select_datasets(self, names):
         """Select datasets given a list of names"""
         return [self.select_dataset(n) for n in names]
 
     @cache
-    def produce_covmat(self, pdf=None, imin=None, imax=None, names=None, use_t0 = True):
+    def produce_covmat(self, pdf=None, imin=None, imax=None, names=None, datasets=None, use_t0=True):
         """Produce the t0 covmat for the given PDF for the datasets.
         Either by using imin-imax or by using a tuple of names.
         """
         central_values = None
-        if names is None and (imin is not None and imax is not None):
-            datasets = self.datasets[imin:imax]
-        else:
-            datasets = self.select_datasets(names=names)
+        if datasets is None:
+            if names is None and (imin is not None and imax is not None):
+                datasets = self.datasets[imin:imax]
+            else:
+                datasets = self.select_datasets(names=names)
 
         if use_t0:
             if pdf is None:
                 raise ValueError("PDF missing for t0")
             if isinstance(pdf, str):
                 pdf = API.pdf(pdf=pdf)
-            central_values = [cached_central_predictions(ds, pdf).to_numpy().reshape(-1)  for ds in datasets]
+            central_values = [
+                cached_central_predictions(ds, pdf).to_numpy().reshape(-1) for ds in datasets
+            ]
 
         cds = [ds.load_commondata() for ds in datasets]
-        covmat = dataset_inputs_covmat_from_systematics(cds, _list_of_central_values=central_values, use_weights_in_covmat=False)
+        covmat = dataset_inputs_covmat_from_systematics(
+            cds, _list_of_central_values=central_values, use_weights_in_covmat=False
+        )
         return covmat
 
     @cache
-    def produce_replica(self, names=None, irep=0, genrep=False):
+    def produce_replica(self, names=None, datasets=None, irep=0, genrep=False):
         """Produce the replica data given a tuple of datasets"""
-        datasets = self.select_datasets(names=names)
+        if datasets is None:
+            datasets = self.select_datasets(names=names)
 
         # Load the data
         lcd = [i.load_commondata() for i in datasets]
-        covmat = self.produce_covmat(use_t0 = False, names=names)
+        if genrep:
+            covmat = self.produce_covmat(use_t0=False, names=names)
+        else:
+            covmat = None
 
-        return make_replica(lcd, irep, covmat, genrep = genrep)
-
-
-
+        return make_replica(lcd, irep, covmat, genrep=genrep)
 
 
 # Limite the shared global data to what's available in this dictionary
@@ -1103,19 +1115,33 @@ shared_global_data = {
     "posdata": None,
 }
 
+sensible_positivity_cuts = [
+    {"dataset": "NNPDF_POS_2P24GEV_FLL", "rule": "x > 5.0e-7"},
+    {"dataset": "NNPDF_POS_2P24GEV_F2C", "rule": "x < 0.74"},
+    {"dataset": "NNPDF_POS_2P24GEV_XGL", "rule": "x > 0.1"},
+    {"dataset": "NNPDF_POS_2P24GEV_XUQ", "rule": "x > 0.1"},
+    {"dataset": "NNPDF_POS_2P24GEV_XUB", "rule": "x > 0.1"},
+    {"dataset": "NNPDF_POS_2P24GEV_XDQ", "rule": "x > 0.1"},
+    {"dataset": "NNPDF_POS_2P24GEV_XDB", "rule": "x > 0.1"},
+    {"dataset": "NNPDF_POS_2P24GEV_XSQ", "rule": "x > 0.1"},
+    {"dataset": "NNPDF_POS_2P24GEV_XSB", "rule": "x > 0.1"},
+]
+
+
 def shared_populate_data():
 
-    config = {
-            "theoryid": fit_pars.theoryidi,
-            "use_cuts": "internal"
-    }
+    config = {"theoryid": fit_pars.theoryidi, "use_cuts": "internal"}
 
     datasets = []
     for dinput in fit_pars.dataset_40:
         ds = API.dataset(dataset_input=dinput, **config)
         datasets.append(ds)
 
-    positivity_datasets = API.posdatasets(posdatasets = fit_pars.pos_data31 + fit_pars.pos_data40, **config)
+    positivity_datasets = API.posdatasets(
+        posdatasets=fit_pars.pos_data31 + fit_pars.pos_data40,
+        **config,
+        added_filter_rules=sensible_positivity_cuts
+    )
 
     shared_global_data["data"] = DataHolder(tuple(datasets))
     shared_global_data["posdata"] = DataHolder(tuple(positivity_datasets))

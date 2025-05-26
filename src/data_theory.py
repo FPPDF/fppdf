@@ -1,16 +1,16 @@
 import numpy as np
-from validphys.convolution import central_predictions
+from functools import cache
 
 from global_pars import fit_pars, pdf_pars, shared_global_data
 
 
-def dat_calc_rep(dscomb, genrep=None):
+@cache
+def dat_calc_rep(datasets, genrep=None):
     """Given a list of datanames, produce the replica pseudodata."""
-    dnames = tuple([i["dataset"] for i in dscomb])
     if genrep is None:
         genrep = fit_pars.pseud
     return shared_global_data["data"].produce_replica(
-        names=dnames, irep=fit_pars.irep, genrep=genrep
+        datasets=datasets, irep=fit_pars.irep, genrep=genrep
     )
 
 
@@ -48,23 +48,33 @@ def del_pen_calc():
     return (chi0d, chi0u, diffd, diffu, hessd, hessu, idv, iuv)
 
 
-def _elu(x, alpha=1e-7):
-    """Exponential Linear Unit"""
-    return np.where(x > 0, x, alpha * (np.exp(x) - 1))
+def compute_theory(datasets, vp_pdf, theta_idx=None) -> np.ndarray:
+    """Compute theory predictions for all given datasets for the given PDF.
 
-
-def pos_calc(pdata, vp_pdf) -> float:
-    """Compute positivity penalty term
-    Takes as input a list of dicts containing a positivity dataset {dataset} and a pdf
+        If a theta_idx is given, the derivative with respect to the parameter will be taken.
+        The result is a concatenation of all theory predictions
     """
-    if vp_pdf is None:
-        raise Exception("Wrong call of pos_calc")
+    ret = []
+    for dataset in datasets:
+        ret.append(vp_pdf.central_predictions(dataset, derivative_theta_idx=theta_idx))
+    return np.concatenate(ret)
 
-    tot = 0.0
-    lam = fit_pars.lampos
 
-    for pos_dict in pdata:
-        posds = shared_global_data["posdata"].select_dataset(pos_dict["dataset"])
-        res = _elu(-lam * central_predictions(posds, vp_pdf).values)
-        tot += np.sum(res)
-    return tot
+def pos_calc(pdata, vp_pdf, theta_idx=None) -> np.ndarray:
+    """Compute positivity penalty term
+    Takes as input a list of dicts containing positivity_datasets and a pdf object,
+    If theta_idx is not None, it returns the derivative wrt the given parameter.
+
+    If theta_idx is None, the "good" (positive) points are set to 0
+
+    Returns the contribution to be included in a loss function:
+        lambda*PosPenalty
+    """
+    lam = fit_pars.lampos * 1e-1
+    ret = compute_theory(pdata, vp_pdf, theta_idx=theta_idx)
+
+    if theta_idx is None:
+        ret = np.minimum(ret, 0.0)
+
+    # Return a positivity contribution to be summed to the loss
+    return -lam * ret       

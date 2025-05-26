@@ -1,132 +1,203 @@
-from global_pars import *
-import numpy as np
-#from scipy.special import gamma
-import numba as nb
+""" 
+    Numba-jitted functions for the calculation chebyshev polynomials
+"""
 
-# IF the only thing that is supposed to go through gamma are scalars
+# when the only thing that is supposed to go through gamma are scalars
 # scipy.special.gamma should be equivalent to math.gamma, which should be supported by numba
-from math import gamma 
+from math import gamma
+
+import numba as nb
+import numpy as np
+
+from global_pars import *
+
 
 @nb.njit
-def I(a,b,xmin):
+def I(a, b):
 
-    if b < 100.:
-        out=gamma(a+1)*gamma(b+1)                                                                   
-        out=out/gamma(a+b+2)   
-    else: # use Stirling's formula for numerical convergence    
-        out=np.sqrt(b/(a+b+1.))*np.power(b/(a+b+1.),b)*np.power(a+b+1.,-a-1.)
-        out=out*gamma(a+1.)*np.exp(a+1.)
-        
-    return out
-
-@nb.njit
-def Iy1(a,b,xmin):
-
-    out=I(a,b,xmin)-2.*I(a+0.5,b,xmin)
-
-    return out
-
-@nb.njit
-def Iy2(a,b,xmin):
-
-    out=I(a,b,xmin)-4.*I(a+0.5,b,xmin)+4.*I(a+1.,b,xmin)
+    if b < 100.0:
+        out = gamma(a + 1) * gamma(b + 1)
+        out = out / gamma(a + b + 2)
+    else:  # use Stirling's formula for numerical convergence
+        out = (
+            np.sqrt(b / (a + b + 1.0))
+            * np.power(b / (a + b + 1.0), b)
+            * np.power(a + b + 1.0, -a - 1.0)
+        )
+        out = out * gamma(a + 1.0) * np.exp(a + 1.0)
 
     return out
 
-@nb.njit
-def Iy3(a,b,xmin):
 
-    out=I(a,b,xmin)-6.*I(a+0.5,b,xmin)+12.*I(a+1.,b,xmin)-8.*I(a+1.5,b,xmin)
+@nb.njit
+def Iy1(a, b):
+
+    out = I(a, b) - 2.0 * I(a + 0.5, b)
 
     return out
 
-@nb.njit
-def Iy4(a,b,xmin):
 
-    out=I(a,b,xmin)-8.*I(a+0.5,b,xmin)+24.*I(a+1.,b,xmin)-32.*I(a+1.5,b,xmin)+16.*I(a+2.,b,xmin)
+@nb.njit
+def Iy2(a, b):
+
+    out = I(a, b) - 4.0 * I(a + 0.5, b) + 4.0 * I(a + 1.0, b)
 
     return out
 
-@nb.njit
-def Iy5(a,b,xmin):
 
-    out=I(a,b,xmin)-10.*I(a+0.5,b,xmin)+40.*I(a+1.,b,xmin)-80.*I(a+1.5,b,xmin)+80.*I(a+2.,b,xmin)-32.*I(a+2.5,b,xmin)
+@nb.njit
+def Iy3(a, b):
+
+    out = I(a, b) - 6.0 * I(a + 0.5, b) + 12.0 * I(a + 1.0, b) - 8.0 * I(a + 1.5, b)
 
     return out
 
-@nb.njit
-def Iy6(a,b,xmin):
 
-    out=I(a,b,xmin)-12.*I(a+0.5,b,xmin)+60.*I(a+1.,b,xmin)-160.*I(a+1.5,b,xmin)+240.*I(a+2.,b,xmin)-192.*I(a+2.5,b,xmin)+64.*I(a+3.,b,xmin)
+@nb.njit
+def Iy4(a, b):
+
+    out = (
+        I(a, b)
+        - 8.0 * I(a + 0.5, b)
+        + 24.0 * I(a + 1.0, b)
+        - 32.0 * I(a + 1.5, b)
+        + 16.0 * I(a + 2.0, b)
+    )
 
     return out
 
+
 @nb.njit
-def Iy7(a,b,xmin):
-    
-    out=I(a,b,xmin)-14.*I(a+0.5,b,xmin)+84.*I(a+1.,b,xmin)-280.*I(a+1.5,b,xmin)+560.*I(a+2.,b,xmin)-672.*I(a+2.5,b,xmin)+448.*I(a+3.,b,xmin)-128.*I(a+3.5,b,xmin)
+def Iy5(a, b):
+
+    out = (
+        I(a, b)
+        - 10.0 * I(a + 0.5, b)
+        + 40.0 * I(a + 1.0, b)
+        - 80.0 * I(a + 1.5, b)
+        + 80.0 * I(a + 2.0, b)
+        - 32.0 * I(a + 2.5, b)
+    )
 
     return out
 
-@nb.njit
-def Iy8(a,b,xmin):
 
-    out=I(a,b,xmin)-16.*I(a+0.5,b,xmin)+112.*I(a+1.,b,xmin)-448.*I(a+1.5,b,xmin)+1120.*I(a+2.,b,xmin)-1792.*I(a+2.5,b,xmin)+1792.*I(a+3.,b,xmin)-1024.*I(a+3.5,b,xmin)+256.*I(a+4.,b,xmin)
+@nb.njit
+def Iy6(a, b):
+
+    out = (
+        I(a, b)
+        - 12.0 * I(a + 0.5, b)
+        + 60.0 * I(a + 1.0, b)
+        - 160.0 * I(a + 1.5, b)
+        + 240.0 * I(a + 2.0, b)
+        - 192.0 * I(a + 2.5, b)
+        + 64.0 * I(a + 3.0, b)
+    )
 
     return out
 
-@nb.njit
-def Ic1(a,b,xmin):
 
-    out=Iy1(a,b,xmin)
+@nb.njit
+def Iy7(a, b):
+
+    out = (
+        I(a, b)
+        - 14.0 * I(a + 0.5, b)
+        + 84.0 * I(a + 1.0, b)
+        - 280.0 * I(a + 1.5, b)
+        + 560.0 * I(a + 2.0, b)
+        - 672.0 * I(a + 2.5, b)
+        + 448.0 * I(a + 3.0, b)
+        - 128.0 * I(a + 3.5, b)
+    )
 
     return out
 
-@nb.njit
-def Ic2(a,b,xmin):
 
-    out=2.*Iy2(a,b,xmin)-I(a,b,xmin)
+@nb.njit
+def Iy8(a, b):
+
+    out = (
+        I(a, b)
+        - 16.0 * I(a + 0.5, b)
+        + 112.0 * I(a + 1.0, b)
+        - 448.0 * I(a + 1.5, b)
+        + 1120.0 * I(a + 2.0, b)
+        - 1792.0 * I(a + 2.5, b)
+        + 1792.0 * I(a + 3.0, b)
+        - 1024.0 * I(a + 3.5, b)
+        + 256.0 * I(a + 4.0, b)
+    )
 
     return out
 
-@nb.njit
-def Ic3(a,b,xmin):
 
-    out=4.*Iy3(a,b,xmin)-3.*Iy1(a,b,xmin)
+@nb.njit
+def Ic1(a, b):
+
+    out = Iy1(a, b)
 
     return out
 
-@nb.njit
-def Ic4(a,b,xmin):
 
-    out=8.*Iy4(a,b,xmin)-8.*Iy2(a,b,xmin)+I(a,b,xmin)
+@nb.njit
+def Ic2(a, b):
+
+    out = 2.0 * Iy2(a, b) - I(a, b)
 
     return out
 
-@nb.njit
-def Ic5(a,b,xmin):
 
-    out=16.*Iy5(a,b,xmin)-20.*Iy3(a,b,xmin)+5.*Iy1(a,b,xmin)
+@nb.njit
+def Ic3(a, b):
+
+    out = 4.0 * Iy3(a, b) - 3.0 * Iy1(a, b)
 
     return out
 
-@nb.njit
-def Ic6(a,b,xmin):
 
-    out=32.*Iy6(a,b,xmin)-48.*Iy4(a,b,xmin)+18.*Iy2(a,b,xmin)-I(a,b,xmin)
+@nb.njit
+def Ic4(a, b):
+
+    out = 8.0 * Iy4(a, b) - 8.0 * Iy2(a, b) + I(a, b)
 
     return out
 
-@nb.njit
-def Ic7(a,b,xmin):
 
-    out=64.*Iy7(a,b,xmin)-112.*Iy5(a,b,xmin)+56.*Iy3(a,b,xmin)-7.*Iy1(a,b,xmin)
+@nb.njit
+def Ic5(a, b):
+
+    out = 16.0 * Iy5(a, b) - 20.0 * Iy3(a, b) + 5.0 * Iy1(a, b)
 
     return out
 
-@nb.njit
-def Ic8(a,b,xmin):
 
-    out=128.*Iy8(a,b,xmin)-256.*Iy6(a,b,xmin)+160.*Iy4(a,b,xmin)-32.*Iy2(a,b,xmin)+I(a,b,xmin)
+@nb.njit
+def Ic6(a, b):
+
+    out = 32.0 * Iy6(a, b) - 48.0 * Iy4(a, b) + 18.0 * Iy2(a, b) - I(a, b)
+
+    return out
+
+
+@nb.njit
+def Ic7(a, b):
+
+    out = 64.0 * Iy7(a, b) - 112.0 * Iy5(a, b) + 56.0 * Iy3(a, b) - 7.0 * Iy1(a, b)
+
+    return out
+
+
+@nb.njit
+def Ic8(a, b):
+
+    out = (
+        128.0 * Iy8(a, b)
+        - 256.0 * Iy6(a, b)
+        + 160.0 * Iy4(a, b)
+        - 32.0 * Iy2(a, b)
+        + I(a, b)
+    )
 
     return out

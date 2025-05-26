@@ -1,6 +1,7 @@
 from global_pars import *
 from chi2s import *
 from outputs import *
+from pathlib import Path
 
 def corrmatcalc(hessi,afin):
 
@@ -282,7 +283,6 @@ def levmar(afree):
 
 
     nstepmax=False
-    zeroblock=False
     af=afree.copy()
 
     lam=0.001
@@ -308,11 +308,19 @@ def levmar(afree):
     
     hessmax=np.zeros((pdf_pars.npar_free,pdf_pars.npar_free))
     hessmaxp=np.zeros((pdf_pars.npar_free,pdf_pars.npar_free))
+
+    # TODO: a context manager would be good here
+    bufferfile = Path("outputs") / "buffer" / f"{inout_pars.label}.dat"
+    outputfile = bufferfile.open("a")
+    outputfile.write(f"""Levmar options:
+    {levmsht=}
+    {lev_update=}
+    {lev_minpack=}
+    {pos_hess=}
+    {lev_comb=}
+    sgd={min_pars.sgd}""")
     
-    # TODO use a context manager for this file
-    outputfile=open('outputs/buffer/'+inout_pars.label+'.dat','a')
-    outputfile.write("LM meth 1 ")
-    outputfile.write("\n")
+    outputfile.write("LM meth 1\n")
     
     if del_grat:
         nsteps=35
@@ -325,7 +333,6 @@ def levmar(afree):
         
         if nt > 1:
             lam=lam/div
-#            lam=lam/np.sqrt(3.)
 
         if lam < lmin:
             lam=lmin
@@ -333,17 +340,12 @@ def levmar(afree):
             lam=lami
         
         print('ntries =', nt)
-        outputfile=open('outputs/buffer/'+inout_pars.label+'.dat','a')
-        outputfile.write("ntries = ")         
-        outputfile.write(str(nt))
-        outputfile.write("\n") 
+        outputfile.write(f"ntries = {nt}\n")
 
         if(nstepmax):
             print('max steps reached: exit')
-            outputfile.write("max steps reached: exit ")
-            outputfile.write("\n")
+            outputfile.write("max steps reached: exit\n")
             hess=hessi.copy()/2.
-            jac=-jaci.copy()/2.
             covmatout(hess,jac)
             break
 
@@ -365,29 +367,20 @@ def levmar(afree):
                 covmatout(hess,jac) 
                 break
 
-        
-        #        lam=0.001
-
-        # TODO skip this condition
-        if(min_pars.sgd):
-            hess_calc=True      # think has to be for lev update
-        else:
-            hess_calc=True
-            
+        hess_calc=True
         jac_calc=True
-        
         dload_pars.dcov=1
 
-    
-        (chi2i,jaci,hessi,err,hessp)=chi2min_fun(af,jac_calc,hess_calc)
+        # Compute the chi2 before the minimization and the jacobian / hessian
+        chi2i, jac, hessi, _, hessp = chi2min_fun(af,jac_calc,hess_calc)
+
+        # Divide the jacobian by 2 and change sign
+        jac /= -2.0
 
         print('chi2i = ',chi2i)
-        print('jac =',-jaci/2.)
+        print('jac =', jac)
         print('hess =',hessi/2.)
-        # exit()
-        #        print('hessp =',hessp)
         
-
         if nt == 1:
             if not lev_update:
                 hess=hessi.copy()/2.
@@ -396,39 +389,16 @@ def levmar(afree):
                 lmin=lam/1e10
                 lami=lam
 
-        # corrmat=corrmatcalc(hessi,af)
-
-
-        # print('corr mat =',corrmat)
-        # print('pars = ',af)
-
-        #        covmatout(hessi)
-
-        
-        #        hesserror_fin(af,hessi/2.,jaci)
-#        (afup,chi2up)=hessdiag_up(af,hessi/2.,-jaci/2.,chi2i,0.)
-
-        outputfile=open('outputs/buffer/'+inout_pars.label+'.dat','a')
-        outputfile.write("chi2i = ")
-        outputfile.write(str(chi2i))
-        outputfile.write("\n")
-        
+        outputfile.write(f"chi2i = {chi2i}\n")
 
         for ns in range(1,nsteps+1):
             
             print('lam = ',lam)
-            outputfile.write("step = ")
-            outputfile.write(str(ns))
-            outputfile.write("\n")
-            outputfile.write("lam = ")
-            outputfile.write(str(lam))
-            outputfile.write("\n")
+            outputfile.write(f"step = {ns} ({lam=})\n")
+
+            hess = hessi/2.
 
             if min_pars.sgd:
-
-                hess=hessi.copy()/2.
-                jac=-jaci.copy()/2.
-
                 if(lev_update):
                     hess=np.diag(hess.diagonal())*lam  # updated relationship                                                   
                 else:
@@ -443,18 +413,8 @@ def levmar(afree):
                 rhoden=lam*delpar@np.diag(hess.diagonal())@delpar+delpar@jac                
                 
             elif not levmsht:
-            
-                hess=hessi.copy()/2.
-                jac=-jaci.copy()/2.
 
-#                print('hessi = ',hessi)
-
-                if(lev_update):
-#                    lammax0=np.max(hess.diagonal())
-#                    lammax=np.max([lammax,lammax0])/10.
-#                    ltrace=1./np.trace(la.inv(hess))
-#                    lammax=ltrace
-
+                if lev_update:
 
                     if(lev_minpack):
                         for i in range(0,len(hess)):
@@ -462,98 +422,67 @@ def levmar(afree):
                             hessmax[i,i]=np.max([hessmax[i,i],hessmax0])
                             hess=hess+lam*hessmax
                     else:
-                        hess=hess+np.diag(hess.diagonal())*lam  # updated relationship
+                        hess += np.diag(hess.diagonal()*lam)
                 else:
                     if(pos_hess):
                         hess=hess+hessp*lam
                     else:
-                        hess=hess+np.diag(np.ones((pdf_pars.npar_free)))*lam
+                        hess += np.eye(pdf_pars.npar_free)*lam
 
                 if(lev_comb):
-                    hess0=hessi.copy()/2.+np.diag(np.ones((pdf_pars.npar_free)))*lam                    
+                    hess0=hessi.copy()/2.+np.diag(np.ones((pdf_pars.npar_free)))*lam 
                     hess0in=la.inv(hess0)
                     print('hess0 =',hess0)
                     delpar0=hess0in@jac
-
-
                     corrmat=corrmatcalc(hess0,af)
                     print('corr mat 0 =',corrmat)
                     
-#                 hessint=hess_zeros(hess)
-                    
                 try:
-                    hessin=la.inv(hess)
+                    hessin = la.inv(hess)
                 except la.LinAlgError as error:
                     print(error)
-                    hessin=hess_zeros(hess)
-
+                    hessin = hess_zeros(hess)
                     parsout()
-                    
                 
-                    
-                #                    lam=lam*10.
-                #                    if ns==nsteps:
-                #                        nstepmax=True
-                #                    continue
-                
-                if(zeroblock):
-                    hessin=hess0inv.copy()
+                delpar = hessin@jac
+                print('delpar = ', delpar)
 
-
-
-                delpar=hessin@jac
-                rhoden=lam*delpar@np.diag(hess.diagonal())@delpar+delpar@jac
-                #                print('rhoden =', rhoden)
-                print('delpar = ',delpar)
-                
-#                delpart=lam*np.diag(np.ones((pdf_pars.npar_free)))@jac
-
-                #                print('delpart = ',delpart)
-                # print('rhoden =', rhoden)
-                
+                #rhoden = lam*delpar@np.diag(hess.diagonal())@delpar+delpar@jac
+                rhoden = lam*np.sum(delpar**2 @ hess.diagonal()) + delpar@jac
             
             elif levmsht:
-                
-                jac=-jaci.copy()/2.
-                hesst=hessi.copy()/2.                                                                         
-                hesstt=hessi.copy()/2.                                                                           
-                for i in range(0,pdf_pars.npar_free):                                                                  
-                    for j in range(0,pdf_pars.npar_free):                                                              
-                        if i==j:                                                                                 
-                            hesst[i,j]=1.+lam                                                                    
-                        else:                                                                                    
-                            hesst[i,j]=hesst[i,j]/np.sqrt(hesstt[i,i]*hesstt[j,j])                               
- 
-                    
-
-#                hesstin=la.inv(hesst)                                                                            
+                hesst=hessi.copy()/2
+                hesstt=hessi.copy()/2.                                       
+                for i in range(0,pdf_pars.npar_free):
+                    for j in range(0,pdf_pars.npar_free):
+                        if i==j: 
+                            hesst[i,j]=1.+lam
+                        else: 
+                            hesst[i,j]=hesst[i,j]/np.sqrt(hesstt[i,i]*hesstt[j,j])    
                 try:
                     hesstin=la.inv(hesst)
                 except la.LinAlgError as error:
                     print(error)
                     hesstin=hess_zeros(hesst)
-
             
-                for i in range(0,pdf_pars.npar_free):                                                                     
-                    for j in range(0,pdf_pars.npar_free):                                                                 
-                        hesstin[i,j]=hesstin[i,j]/np.sqrt(hesstt[i,i]*hesstt[j,j])                               
-                        
+                for i in range(0,pdf_pars.npar_free):                        
+                    for j in range(0,pdf_pars.npar_free):                              
+                        hesstin[i,j]=hesstin[i,j]/np.sqrt(hesstt[i,i]*hesstt[j,j])       
                 delpar=jac@hesstin  
-            
 
-            aft=af.copy()+delpar
-
-
+            # Update parameters:
+            aft = af + delpar
             if(lev_comb):
-                aft0=af.copy()+delpar0
+                aft0 = af + delpar0
 
             print('pars after step = ',aft)
+            outputfile.write(f"pars after step: {aft}\n")
             
             hess_calc=False
             jac_calc=False
             dload_pars.dcov=1
-
-            (chi2o,jaco,hesso,erro,hesspo)=chi2min_fun(aft,jac_calc,hess_calc)
+            
+            chi2o, _, _, erro, _ =  chi2min_fun(aft,jac_calc,hess_calc)
     
             if(lev_comb):
                 (chi2o0,jaco0,hesso0,erro0,hesspo0)=chi2min_fun(aft0,jac_calc,hess_calc)
@@ -587,9 +516,6 @@ def levmar(afree):
             if(lev_comb):
                 chi2o=min(chi2o0,chi2o)
             
-
-
-
             delchi=chi2i-chi2o
 
             if rhocon:

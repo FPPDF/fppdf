@@ -284,6 +284,10 @@ tzero=time.process_time()
 
 print('inputnam = ',inout_pars.inputnam)
 
+
+##### TODO: start populating the shared data here
+shared_populate_data()
+
 if inout_pars.readcov:
     chi2_pars.t0=True
     # fit_pars.pos_const=False
@@ -330,8 +334,6 @@ else:
 
     vp_pdf = MSHTPDF(name = pdfname, pdf_parameters = pdf_parameters, pdf_function = "msht")
 
-##### TODO: start populating the shared data here
-shared_populate_data()
 
 
 if inout_pars.readcov:
@@ -477,7 +479,7 @@ elif(use_levmar):
             dload_pars.dcov=1
 
 
-        if fit_pars.nnpdf_pos:
+        if fit_pars.nnpdf_pos and False:
             # TODO: there are a few calls to levmar here that need to be treated
             if(inout_pars.pdin):
                 chi2_pars.t0=False

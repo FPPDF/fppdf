@@ -1,9 +1,13 @@
 from global_pars import *
+from pathlib import Path
 import numpy as np
 import scipy.linalg as la
 from chi2s import *
 from outputs import *
 from scipy.optimize import newton
+
+OUTDIR_EV = Path("outputs/evscans")
+OUTDIR_EV.mkdir(exist_ok = True, parents=True)
 
 def hesserror_dynamic_tol(afi,hess,jaci):
 
@@ -452,7 +456,7 @@ def hesserror_new(afi,hess,jaci):
     if msht_fix:
         (hess,afi)=hessfix(hess)
 
-    output='outputs/evscans/'+inout_pars.label+'.dat'
+    output = OUTDIR_EV / f"{inout_pars.label}.dat"
 
     # hessinv=la.inv(hess)
     # lamt,eigt = la.eigh(hessinv)
