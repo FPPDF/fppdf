@@ -58,7 +58,7 @@ fit pars:
   theoryidi: 40001000
   # impose NNPDF positivity in fit
   nnpdf_pos: true
-  lampos: 10 # do a very small positivity
+  lampos: 1000
   # if true then impose 4.0 positivity constraint, if pos_const=True
   pos_40: True
   # if true impose weight to prefer delta_d > 0.25

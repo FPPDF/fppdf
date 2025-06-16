@@ -3,6 +3,20 @@ from chi2s import *
 from outputs import *
 from pathlib import Path
 
+class _BufferLog:
+
+    def __init__(self, outfile):
+        self._outfile = outfile.open("a")
+
+    def write(self, msg):
+        # TODO: to be changed by an actual loggerr
+        msg = msg.strip()
+        print(msg)
+        self._outfile.write(f"{msg}\n")
+
+    def __del__(self):
+        self._outfile.close()
+
 def corrmatcalc(hessi,afin):
 
     corrmat=hessi.copy()/2.
@@ -32,19 +46,17 @@ def levmar_meth2(afree):
     af=afree.copy()
     jac_calc=True
     hess_calc=True
-    (chi2i,jaci,hessi,err,hessp)=chi2min_fun(af,jac_calc,hess_calc)
+    chi2i, jaci, hessi, _, _ =chi2min_fun(af,jac_calc,hess_calc)
     hess=hessi.copy()/2.
     jac=-jaci.copy()/2.
 
     lam0=1e-4
     lam0=np.max(hess.diagonal())*lam0
     lam=lam0
-    nu=2.
 
     nsteps=30
     ntries=500
     tol=0.02
-    tolstop=tol
 
     outputfile=open('outputs/buffer/'+inout_pars.label+'.dat','a')
 
@@ -274,53 +286,39 @@ def levmar(afree):
         lev_update=True
     rhocon=False
     levmsht=False
-    levboth=False
     nsteps=30
     ntries=1000
     tol=min_pars.tollm
-    # if(inout_pars.pdin):
-    #     tol=0.01
-
 
     nstepmax=False
     af=afree.copy()
 
     lam=0.001
-    # lam=1e-6
-    # lam=1e-10
-    lami=lam
+    lam_initial = lam
 
     del_grat=False
     pos_hess=False
 
-    lammax=0.
-
     div=10.
 
     mult=div
-#    mult=5.
-#    div=1.5
 
     lmin=1e-10
-    # if(lev_minpack):
-    #     lmin=1e-30
-
     
     hessmax=np.zeros((pdf_pars.npar_free,pdf_pars.npar_free))
-    hessmaxp=np.zeros((pdf_pars.npar_free,pdf_pars.npar_free))
 
     # TODO: a context manager would be good here
     bufferfile = Path("outputs") / "buffer" / f"{inout_pars.label}.dat"
-    outputfile = bufferfile.open("a")
-    outputfile.write(f"""Levmar options:
+    _bufferlog = _BufferLog(bufferfile)
+    _bufferlog.write(f"""Levmar options:
     {levmsht=}
     {lev_update=}
     {lev_minpack=}
     {pos_hess=}
     {lev_comb=}
-    sgd={min_pars.sgd}""")
-    
-    outputfile.write("LM meth 1\n")
+    sgd={min_pars.sgd}
+LM meth 1
+""")
     
     if del_grat:
         nsteps=35
@@ -328,44 +326,61 @@ def levmar(afree):
     if min_pars.sgd:
         nsteps=100
         ntries=20
-    
-    for nt in range(1,ntries):
-        
+
+    # Do ntries without positivity,
+    nt = 0
+    chi2i = 1e10 
+    chi2o = 1e10
+    # if positivity is to be activated, do so after we would've finished
+    # if and only if we finished due to tolerance
+    fit_pars.pos_const = False
+
+    while nt < ntries:
+        nt += 1
+
         if nt > 1:
             lam=lam/div
 
         if lam < lmin:
             lam=lmin
-        if lam > lami:
-            lam=lami
+        if lam > lam_initial:
+            lam = lam_initial
         
-        print('ntries =', nt)
-        outputfile.write(f"ntries = {nt}\n")
+        _bufferlog.write(f'ntries = {nt}')
 
         if(nstepmax):
-            print('max steps reached: exit')
-            outputfile.write("max steps reached: exit\n")
+            _bufferlog.write('max steps reached: exit')
             hess=hessi.copy()/2.
             covmatout(hess,jac)
             break
 
-        if nt > 1:
-            # break
-            if((chi2i-chi2o) < tol):
-                print('chi2i - chi2o < tol : exit')
-                outputfile.write("chi2i - chi2o < tol : exit ")
-                outputfile.write("\n")
-                jac_calc=True
-                hess_calc=True
-                print('running chi2min_fun')
-                dload_pars.dcov=1
-                chi2_pars.add_hessp=False
-                (chi2i,jaci,hessi,err,hessp)=chi2min_fun(af,jac_calc,hess_calc)
-                print('run chi2min_fun')
-                hess=hessi.copy()/2.
-                jac=-jaci.copy()/2.
-                covmatout(hess,jac) 
-                break
+        if chi2o < 1e4 and not fit_pars.pos_const: # approx. chi2 ~ 2.5
+            # Cheap way of implementing positivity
+            fit_pars.pos_const = fit_pars.nnpdf_pos
+
+        if nt > 1 and (abs(chi2i - chi2o) < tol):
+            _bufferlog.write(f"Tolerance reached: {chi2i=:.5} - {chi2o:.5} < {tol}")
+            # Check whether we are leaving
+            # Do we need to start the positivity scan?
+            if fit_pars.nnpdf_pos and not fit_pars.pos_const:
+                _bufferlog.write("########### Restart with positivity")
+                fit_pars.pos_const = True
+                # Set to 1 and go back to the top of the loop
+                nt = 0
+                lam = lam_initial
+                continue
+            _bufferlog.write("Exit!")
+            jac_calc=True
+            hess_calc=True
+            print('running chi2min_fun')
+            dload_pars.dcov=1
+            chi2_pars.add_hessp=False
+            (chi2i,jaci,hessi,_,hessp)=chi2min_fun(af,jac_calc,hess_calc)
+            print('run chi2min_fun')
+            hess=hessi.copy()/2.
+            jac=-jaci.copy()/2.
+            covmatout(hess,jac) 
+            break
 
         hess_calc=True
         jac_calc=True
@@ -387,14 +402,12 @@ def levmar(afree):
                 lammax0=np.max(hess.diagonal())
                 lam=lam*lammax0
                 lmin=lam/1e10
-                lami=lam
 
-        outputfile.write(f"chi2i = {chi2i}\n")
+        _bufferlog.write(f"chi2i = {chi2i}")
 
         for ns in range(1,nsteps+1):
             
-            print('lam = ',lam)
-            outputfile.write(f"step = {ns} ({lam=})\n")
+            _bufferlog.write(f"step = {ns} ({lam=})\n")
 
             hess = hessi/2.
 
@@ -475,8 +488,7 @@ def levmar(afree):
             if(lev_comb):
                 aft0 = af + delpar0
 
-            print('pars after step = ',aft)
-            outputfile.write(f"pars after step: {aft}\n")
+            _bufferlog.write(f"pars after step: {aft}")
             
             hess_calc=False
             jac_calc=False
@@ -485,13 +497,9 @@ def levmar(afree):
             chi2o, _, _, erro, _ =  chi2min_fun(aft,jac_calc,hess_calc)
     
             if(lev_comb):
-                (chi2o0,jaco0,hesso0,erro0,hesspo0)=chi2min_fun(aft0,jac_calc,hess_calc)
-                delchi0=chi2i-chi2o0
+                chi2o0, *_ = chi2min_fun(aft0,jac_calc,hess_calc)
                 print('chi2o0 - chi2i = ',chi2o0-chi2i)        
-                outputfile=open('outputs/buffer/'+inout_pars.label+'.dat','a')
-                outputfile.write("chi2o0 = ")
-                outputfile.write(str(chi2o0))
-                outputfile.write("\n")
+                _bufferlog.write(f"chi2o0 = {chi2o0}")
 
                 print('delpar=',delpar)
                 print('delpar0=',delpar0)
@@ -505,13 +513,8 @@ def levmar(afree):
             else:
                 print('chi2o,chi2i = ',chi2o,chi2i)
                 print('chi2o - chi2i = ',chi2o-chi2i)
-                outputfile=open('outputs/buffer/'+inout_pars.label+'.dat','a')
-                outputfile.write("chi2o = ")
-                outputfile.write(str(chi2o))
-                outputfile.write("\n")
-                outputfile.write("chi2i = ")
-                outputfile.write(str(chi2i))
-                outputfile.write("\n")
+                _bufferlog.write(f"{chi2o=}")
+                _bufferlog.write(f"{chi2i=}")
   
             if(lev_comb):
                 chi2o=min(chi2o0,chi2o)
@@ -519,7 +522,6 @@ def levmar(afree):
             delchi=chi2i-chi2o
 
             if rhocon:
-                rho=delchi/rhoden
                 eps_rho=0.01*rhoden
                 print('rhoden = ',rhoden)
                 print('eps_rho =',eps_rho)
@@ -529,13 +531,8 @@ def levmar(afree):
             if delchi > eps_rho:
                 af=aft.copy()
                 parsout()
-                print('chi2o < chi2i - next iteration')
-                outputfile.write("chi2o < chi2i - next iteration ")
-                outputfile.write("\n")
-#                print('rhoden =',rhoden)
+                _bufferlog.write("chi2o < chi2i - next iteration")
                 print('new pars = ',af)
-#                print('cheb sum =',np.sum(af)-af[0]-af[1])
-#                print('cheb dif =',-af[2]+af[3]-af[4]+af[5]-af[6]+af[7])
                 break           
 
             if ns==nsteps:
@@ -546,7 +543,6 @@ def levmar(afree):
                 lam=lam*3.
             else:
                 lam=lam*mult
-#                lam=lam*np.sqrt(3.)
                 
     afout=aft
 

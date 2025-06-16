@@ -57,7 +57,7 @@ fit pars:
   # NNPDF theory id (211 = NNLO pch)
   theoryidi: 40001000
   # impose NNPDF positivity in fit
-  nnpdf_pos: False
+  nnpdf_pos: True
   # if true then impose 4.0 positivity constraint, if pos_const=True
   pos_40: True
   # if true impose weight to prefer delta_d > 0.25
