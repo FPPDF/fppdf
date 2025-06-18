@@ -1,14 +1,15 @@
-import numba as nb
-from pathlib import Path
-import numpy as np
 import functools
+from pathlib import Path
+
+import numba as nb
+import numpy as np
 import scipy.linalg as la
 import scipy.stats as st
 from validphys.api import API
 from validphys.calcutils import calc_chi2
 
-from data_theory import dat_calc_rep, pos_calc, compute_theory
-from global_pars import (
+from fixparpdf.data_theory import compute_theory, dat_calc_rep, pos_calc
+from fixparpdf.global_pars import (
     chi2_pars,
     dload_pars,
     fit_pars,
@@ -17,7 +18,7 @@ from global_pars import (
     pdf_pars,
     shared_global_data,
 )
-from pdfs import MSHTPDF, initpars, parcheck, parset, sumrules
+from fixparpdf.pdfs import MSHTPDF, initpars, parcheck, parset, sumrules
 
 
 class ParameterError(Exception):

@@ -1,10 +1,12 @@
-from global_pars import *
 from pathlib import Path
+
 import numpy as np
 import scipy.linalg as la
-from chi2s import *
-from outputs import *
 from scipy.optimize import newton
+
+from fixparpdf.chi2s import *
+from fixparpdf.global_pars import *
+from fixparpdf.outputs import *
 
 OUTDIR_EV = Path("outputs/evscans")
 OUTDIR_EV.mkdir(exist_ok = True, parents=True)

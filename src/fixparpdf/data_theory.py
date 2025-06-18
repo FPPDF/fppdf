@@ -1,7 +1,8 @@
-import numpy as np
 from functools import cache
 
-from global_pars import fit_pars, pdf_pars, shared_global_data
+import numpy as np
+
+from fixparpdf.global_pars import fit_pars, pdf_pars, shared_global_data
 
 
 @cache

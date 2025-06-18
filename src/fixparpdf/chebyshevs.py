@@ -9,7 +9,7 @@ from math import gamma
 import numba as nb
 import numpy as np
 
-from global_pars import *
+from fixparpdf.global_pars import *
 
 
 @nb.njit

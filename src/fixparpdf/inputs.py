@@ -1,6 +1,8 @@
-from global_pars import *
 import numpy as np
-from outputs import BUFFER_F
+
+from fixparpdf.global_pars import *
+from fixparpdf.outputs import BUFFER_F
+
 
 def readincov():
 

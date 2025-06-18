@@ -1,9 +1,9 @@
-from global_pars import *
-from pdfs import *
 import numpy as np
-import os
 from reportengine.utils import yaml_safe
-from lhapdf_funs import *
+
+from fixparpdf.global_pars import *
+from fixparpdf.lhapdf_funs import *
+from fixparpdf.pdfs import *
 
 OUTPUT_F = Path("outputs")
 BUFFER_F = OUTPUT_F / "buffer"

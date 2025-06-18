@@ -1,7 +1,9 @@
-from global_pars import *
-from chi2s import *
-from outputs import *
 from pathlib import Path
+
+from fixparpdf.chi2s import *
+from fixparpdf.global_pars import *
+from fixparpdf.outputs import *
+
 
 class _BufferLog:
 

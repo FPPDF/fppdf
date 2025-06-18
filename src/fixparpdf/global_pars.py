@@ -1,6 +1,7 @@
+import dataclasses
+
 import numpy as np
 from validphys.loader import Loader
-import dataclasses
 
 DEBUG = False
 # TODO: The newmin parameter should always be true
@@ -1016,13 +1017,14 @@ class Dummy:
         pass
 
 
-from validphys.api import API
 import dataclasses
 from functools import cache, cached_property
+
+from nnpdf_data.validphys_compatibility import legacy_to_new_map
+from validphys.api import API
 from validphys.convolution import central_predictions
 from validphys.covmats import dataset_inputs_covmat_from_systematics
 from validphys.pseudodata import make_replica
-from nnpdf_data.validphys_compatibility import legacy_to_new_map
 
 
 def _sanitize(name):

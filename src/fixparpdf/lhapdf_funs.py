@@ -1,11 +1,11 @@
-import shutil
 from pathlib import Path
+import shutil
 
 import lhapdf
 import numpy as np
 
-from global_pars import fit_pars, pdf_pars
-from pdfs import pdfs_msht
+from fixparpdf.global_pars import fit_pars, pdf_pars
+from fixparpdf.pdfs import pdfs_msht
 
 
 def initlha(name, lhdir):

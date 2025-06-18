@@ -1,11 +1,11 @@
-import functools
 from copy import deepcopy
+import functools
 
 import numba as nb
 import numpy as np
 
-import chebyshevs as cheb
-from global_pars import *
+import fixparpdf.chebyshevs as cheb
+from fixparpdf.global_pars import *
 
 try:
     from scipy.integrate import quadrature
