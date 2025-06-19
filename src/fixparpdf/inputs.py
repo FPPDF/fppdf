@@ -37,9 +37,9 @@ def readincov():
     print(afin)
 
     # hess=np.loadtxt(inputfile,skiprows=67,max_rows=53)
-    # Old input file
+    # Old inputnam
     # hess=np.loadtxt(inputfile,skiprows=67,max_rows=pdf_pars.npar_free)
-    # New free charm input file
+    # New free charm inputnam
     hess=np.loadtxt(inputfile,skiprows=76,max_rows=pdf_pars.npar_free)
 
 #    hessin=np.loadtxt(inputfile,skiprows=68+pdf_pars.npar_free,max_rows=pdf_pars.npar_free)
@@ -57,7 +57,7 @@ def readincov():
     return (afin,hess,jac)
 
 def readin():
-    """Read the input file inputs::input_file
+    """Read the inputnam inputs::input_file
 
     Uses ``np.loadtxt`` to read the file a few times once per flavour.
     These parameters are the initial parameters of the fit.

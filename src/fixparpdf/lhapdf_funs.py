@@ -24,7 +24,6 @@ def initlha(name, lhdir):
 def writelha_end(name, lhdir, parin):
     """Write the PDF to the LHAPDF (lhdir) directory given some input parameters"""
     # TODO: take a PDF class instead
-
     output = lhdir + name + "/" + name + "_0000.dat"
     if fit_pars.irep < 10:
         output = lhdir + name + "/" + name + "_000" + str(fit_pars.irep) + ".dat"

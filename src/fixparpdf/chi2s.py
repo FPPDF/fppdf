@@ -76,7 +76,6 @@ def chi2min_fun(afree, jac_calc=False, hess_calc=False, vp_pdf=None):
         return (out, jac, hess, err, hessp)
 
     # TODO: do we need to set up these variables?
-    dload_pars.xarr_tot = xgrid_calc()
     pdf_pars.pdfparsi = pdf_parameters
 
     if vp_pdf is None:
@@ -103,39 +102,8 @@ def chi2min_fun(afree, jac_calc=False, hess_calc=False, vp_pdf=None):
         eps_arr = np.zeros((pdf_pars.npar_free + 1))
         chi2_pars.eps_arr_newmin = eps_arr
 
-# This loop is only used when reading directly from LHAPDF or when delta_d is active
-# not sure what to make of it when reading from LHAPDF but for the rest it can be skipped?
-#         pdf_pars.derivatives = []
-#         for ip in range(0, pdf_pars.npar_free + 1):
-# 
-#             # TODO: to remove
-#             idir_j = pdf_pars.idir + ip
-#             name = inout_pars.label + '_run' + str(idir_j)
-#             pdflabel_arr[ip] = name
-# 
-#             if ip != 0 and fit_pars.deld_const:
-#                 # Modify parameter i (ip-1) by an epsilon defined in the function
-#                 parin1, eps_arr[ip] = parinc(pdf_parameters, ip - 1, 1)
-#                 pdf_pars.deld_arr[ip] = parin1[10]
-#                 pdf_pars.delu_arr[ip] = parin1[1]
-# 
-#             if pdf_pars.uselha:
-#                 # TODO what about this
-#                 chi2_pars.ipdf_newmin = ip
-#                 if ip > 0:
-#                     parameter_index = pdf_pars.par_free_i[ip - 1]
-#                     pdf_derivative = vp_pdf.make_derivative(parameter_index)
-#                     pdf_pars.derivatives.append(pdf_derivative)
-
         jac, hess, out0, out1, hessp = jaccalc_newmin(hess_calc, vp_pdf)
         out = out0 + out1
-
-#         if pdf_pars.uselha:
-#             for ip in range(0, pdf_pars.npar_free + 1):
-#                 idir_j = pdf_pars.idir + ip
-#                 name = inout_pars.label + '_run' + str(idir_j)
-# 
-#             pdf_pars.idir += pdf_pars.npar_free + 1
 
     else:
 
@@ -169,260 +137,6 @@ def chi2corr(datasets, vp_pdf=None, theta_idx=None):
 def chi2corr_pdf():
     raise Exception("This is used in the closure test?")
 
-    L0_old=False
-
-    npdf=8
-    nx=500
-#    nx=120
-
-    chi2_pars.ndat=nx*npdf
-
-    chi2_pars.ndat=nx
-
-    xmin=1e-5
-    xmax=0.99
-
-    # xmax=0.8
-    # xmin=1e-3
-
-    if L0_old:
-        nx=400
-        inputfile='outputs/pseudodata/'+pdf_closure.pdlabel+'.dat'
-        distin=np.loadtxt(inputfile)
-        xtot=distin[0:nx,0].flatten()
-
-
-        # xmin=1e-3
-        # xmax=0.8
-
-    lxmin=np.log(xmin)
-    lxmax=np.log(xmax)
-    delerr=0.01
-
-    if fit_pars.theoryidi==211 or fit_pars.theoryidi==40001000 or fit_pars.theoryidi==50001000:
-        qin=1.
-    elif fit_pars.theoryidi==200:
-        qin=1.65
-
-
-    parr=pdf_pars.parinarr[pdf_pars.iPDF].copy()
-    indices=[3,4,5,6,7,8]
-    chebsum=np.sum(parr[indices])
-
-
-    theorytot=np.zeros((1))
-    if(inout_pars.pdout):
-        errtot=np.zeros((1))
-        truetot=np.zeros((1))
-        xtot=np.zeros((1))
-
-    if(pdf_pars.uselha):
-        pset = lhapdf.getPDFSet(pdf_pars.PDFlabel)
-        pdfs = pset.mkPDFs()
-
-        # for ip in range(0,npdf):
-    for ip in range(0,1):
-        for ix in range(0,nx):
-            lx=lxmin+(lxmax-lxmin)*(ix-1)/nx
-            x=np.exp(lx)
-
-            if L0_old:
-                x=xtot[ix]
-            
-            if(inout_pars.pdout):
-                if(pdf_pars.uselha):
-                    if ip == 0:
-                        gluon=pdfs[0].xfxQ(0,x,qin)
-                    elif ip == 1:
-                        gluon=pdfs[0].xfxQ(2,x,qin)-pdfs[0].xfxQ(-2,x,qin)
-                    elif ip == 2:
-                        gluon=pdfs[0].xfxQ(1,x,qin)-pdfs[0].xfxQ(-1,x,qin)
-                    elif ip == 3:
-                        gluon=2.*(pdfs[0].xfxQ(-1,x,qin)+pdfs[0].xfxQ(-2,x,qin))
-                        gluon=gluon+pdfs[0].xfxQ(3,x,qin)+pdfs[0].xfxQ(-3,x,qin)
-                    elif ip == 4:
-                        gluon=pdfs[0].xfxQ(3,x,qin)+pdfs[0].xfxQ(-3,x,qin)
-                    elif ip == 5:
-                        gluon=pdfs[0].xfxQ(-1,x,qin)/pdfs[0].xfxQ(-2,x,qin)
-                    elif ip == 6:
-                        gluon=pdfs[0].xfxQ(3,x,qin)-pdfs[0].xfxQ(-3,x,qin)
-                    elif ip == 7:
-                        gluon=pdfs[0].xfxQ(4,x,qin)+pdfs[0].xfxQ(-4,x,qin)
-                else:
-                    if ip == 0:
-                        gluon=pdfs_msht(0,pdf_pars.pdfparsi,x)
-                    elif ip == 1:
-                        gluon=pdfs_msht(2,pdf_pars.pdfparsi,x)-pdfs_msht(-2,pdf_pars.pdfparsi,x)
-                    elif ip == 2:
-                        gluon=pdfs_msht(1,pdf_pars.pdfparsi,x)-pdfs_msht(-1,pdf_pars.pdfparsi,x)
-                    elif ip == 3:
-                        gluon=2.*(pdfs_msht(-1,pdf_pars.pdfparsi,x)+pdfs_msht(-2,pdf_pars.pdfparsi,x))
-                        gluon=gluon+pdfs_msht(3,pdf_pars.pdfparsi,x)+pdfs_msht(-3,pdf_pars.pdfparsi,x)
-                    elif ip == 4:
-                        gluon=pdfs_msht(3,pdf_pars.pdfparsi,x)+pdfs_msht(-3,pdf_pars.pdfparsi,x)
-                    elif ip == 5:
-                        gluon=pdfs_msht(-1,pdf_pars.pdfparsi,x)/pdfs_msht(-2,pdf_pars.pdfparsi,x)
-                    elif ip == 6:
-                        gluon=pdfs_msht(3,pdf_pars.pdfparsi,x)-pdfs_msht(-3,pdf_pars.pdfparsi,x)
-                    elif ip == 7:
-                        gluon=pdfs_msht(4,pdf_pars.pdfparsi,x)+pdfs_msht(-4,pdf_pars.pdfparsi,x)
-            else:
-                if(pdf_pars.uselha):
-                    if ip == 0:
-                        gluon=pdfs[0].xfxQ(0,x,qin)
-                    elif ip == 1:
-                        gluon=pdfs[0].xfxQ(2,x,qin)-pdfs[0].xfxQ(-2,x,qin)
-                    elif ip == 2:
-                        gluon=pdfs[0].xfxQ(1,x,qin)-pdfs[0].xfxQ(-1,x,qin)
-                    elif ip == 3:
-                        gluon=2.*(pdfs[0].xfxQ(-1,x,qin)+pdfs[0].xfxQ(-2,x,qin))
-                        gluon=gluon+pdfs[0].xfxQ(3,x,qin)+pdfs[0].xfxQ(-3,x,qin)
-                    elif ip == 4:
-                        gluon=pdfs[0].xfxQ(3,x,qin)+pdfs[0].xfxQ(-3,x,qin)
-                    elif ip == 5:
-                        gluon=pdfs[0].xfxQ(-1,x,qin)/pdfs[0].xfxQ(-2,x,qin)
-                    elif ip == 6:
-                        gluon=pdfs[0].xfxQ(3,x,qin)-pdfs[0].xfxQ(-3,x,qin)
-                    elif ip == 7:
-                        gluon=pdfs[0].xfxQ(4,x,qin)+pdfs[0].xfxQ(-4,x,qin)
-                else:
-                    if ip == 0:
-                        gluon=pdfs_msht(0,pdf_pars.parinarr[pdf_pars.iPDF],x)
-                    elif ip == 1:
-                        gluon=pdfs_msht(2,pdf_pars.parinarr[pdf_pars.iPDF],x)-pdfs_msht(-2,pdf_pars.parinarr[pdf_pars.iPDF],x)
-                    elif ip == 2:
-                        gluon=pdfs_msht(1,pdf_pars.parinarr[pdf_pars.iPDF],x)-pdfs_msht(-1,pdf_pars.parinarr[pdf_pars.iPDF],x)
-                    elif ip == 3:
-                        gluon=2.*(pdfs_msht(-1,pdf_pars.parinarr[pdf_pars.iPDF],x)+pdfs_msht(-2,pdf_pars.parinarr[pdf_pars.iPDF],x))
-                        gluon=gluon+pdfs_msht(3,pdf_pars.parinarr[pdf_pars.iPDF],x)+pdfs_msht(-3,pdf_pars.parinarr[pdf_pars.iPDF],x)
-                    elif ip == 4:
-                        gluon=pdfs_msht(3,pdf_pars.parinarr[pdf_pars.iPDF],x)+pdfs_msht(-3,pdf_pars.parinarr[pdf_pars.iPDF],x)
-                    elif ip == 5:
-                        gluon=pdfs_msht(-1,pdf_pars.parinarr[pdf_pars.iPDF],x)/pdfs_msht(-2,pdf_pars.parinarr[pdf_pars.iPDF],x)
-                    elif ip == 6:
-                        gluon=pdfs_msht(3,pdf_pars.parinarr[pdf_pars.iPDF],x)-pdfs_msht(-3,pdf_pars.parinarr[pdf_pars.iPDF],x)
-                    elif ip == 7:
-                        gluon=pdfs_msht(4,pdf_pars.parinarr[pdf_pars.iPDF],x)+pdfs_msht(-4,pdf_pars.parinarr[pdf_pars.iPDF],x)
-
-            if(inout_pars.pdout):
-                error=np.abs(gluon*delerr)
-                if error < 1e-5:
-                    error=1e-5
-                errtot=np.append(errtot,error)
-
-                xtot=np.append(xtot,x)
-
-                if(pdf_closure.pdfscat):
-                    gluono=gluon
-                    gluon=gluon+np.random.normal()*error
-                    truetot=np.append(truetot,gluono)
-                else:
-                    truetot=np.append(truetot,gluon)
-
-            theorytot=np.append(theorytot,gluon)
-
-    theorytot=np.delete(theorytot,0)
-
-    if(inout_pars.pdout):
-        errtot=np.delete(errtot,0)
-        truetot=np.delete(truetot,0)
-        xtot=np.delete(xtot,0)
-
-    if(inout_pars.pdout):
-        outputfile=open('outputs/pseudodata/'+pdf_closure.pdlabel+'.dat','w')
-        for i in range (0,len(theorytot)):
-            outputfile.write(str(theorytot[i]))
-            outputfile.write(' ')
-            outputfile.write(str(errtot[i]))
-            outputfile.write(' ')
-            outputfile.write(str(truetot[i]))
-            outputfile.write(' ')
-            outputfile.write(str(xtot[i]))
-            outputfile.write('\n')
-
-    if inout_pars.pdin:
-        if dload_pars.dflag==1:
-
-            if L0_old:
-                nx=400
-                inputfile='outputs/pseudodata/'+pdf_closure.pdlabel+'.dat'
-                distin=np.loadtxt(inputfile)
-                xtot=distin[0:nx,0].flatten()
-                dattot=distin[0:nx,1].flatten()
-                truetot=dattot
-                errtot=dattot*delerr
-                # print(errtot)
-                # exit()
-                # for i in range(0,len(errtot)):
-                #     error=errtot[i]
-                #     if error < 1e-4:
-                #         errtot[i]=1e-4
-            else:
-                inputfile='outputs/pseudodata/'+pdf_closure.pdlabel+'.dat'
-                print('testdir =',pdf_closure.pdlabel)
-                distin=np.loadtxt(inputfile)
-                dattot=distin[0:len(theorytot),0].flatten()
-                errtot=distin[0:len(theorytot),1].flatten()
-                truetot=distin[0:len(theorytot),2].flatten()
-                xtot=distin[0:len(theorytot),3].flatten()
-
-
-            for i in range(0,len(theorytot)): 
-                
-                if np.abs(errtot[i]) < 1e-4:
-                    errtot[i]=1e-4
-
-            dload_pars.darr_gl=dattot
-            dload_pars.err_gl=errtot
-            dload_pars.true_gl=truetot
-            dload_pars.x_gl=xtot
-            dload_pars.dflag=0
-        else:
-            dattot=dload_pars.darr_gl
-            errtot=dload_pars.err_gl
-            truetot=dload_pars.true_gl
-            xtot=dload_pars.x_gl
-        
-    cov=np.zeros((len(theorytot),len(theorytot)))
-    for i in range (0,len(theorytot)):
-        cov[i,i]=np.power(errtot[i],2)
-
-    if(inout_pars.pdin):
-
-        if L0_old:
-            for i in range(0,len(theorytot)):
-                if xtot[i] > 0.5 or xtot[i] < 1e-3:
-                    theorytot[i]=dattot[i]
-
-        diffs=theorytot-dattot
-        out=calc_chi2(la.cholesky(cov, lower=True), diffs)
-        diffs_true=np.abs((theorytot-truetot)/truetot)
-        out_true=np.sum(diffs_true)/chi2_pars.ndat
-
-    else:
-        diffs=0.
-
-
-    if pdf_pars.iPDF == 0 and inout_pars.pdin:
-#        print('wtcheb= ',wtcheb)
-        print('av diff =',out_true)
-        # print((theorytot-truetot)/truetot)
-        outputfile=open('outputs/pseudodata/pdfcomp/'+pdf_closure.pdlabel+'.dat','w')
-        for i in range (0,len(theorytot)):
-            outputfile.write(str(xtot[i]))
-            outputfile.write(' ')
-            outputfile.write(str(theorytot[i]))
-            outputfile.write(' ')
-            outputfile.write(str(truetot[i]))
-            outputfile.write(' ')
-            outputfile.write(str((theorytot[i]-truetot[i])/truetot[i]*100.))
-            outputfile.write('\n')
-
-
-    covin=la.inv(cov)
-
-    return (out,theorytot,cov,covin)
-
 def chi2corr_ind_plot(imin,imax):
 
     for i in range(imin,imax+1):
@@ -431,14 +145,11 @@ def chi2corr_ind_plot(imin,imax):
 
     if(chi2_pars.t0):
         cov_gl=dload_pars.covt0
-        covin_gl=dload_pars.covt0_inv
     else:
         cov_gl=dload_pars.covexp
-        covin_gl=dload_pars.covexp_inv
 
     cov_ind=cov_gl[chi2_pars.idat_low_arr[imin]:chi2_pars.idat_up_arr[imax],chi2_pars.idat_low_arr[imin]:chi2_pars.idat_up_arr[imax]]
     cov=cov_ind
-    cov_inv=la.inv(cov)
 
     dattot=dload_pars.darr_gl[chi2_pars.idat_low_arr[imin]:chi2_pars.idat_up_arr[imax]]
 
@@ -456,16 +167,10 @@ def chi2corr_ind_plot(imin,imax):
 
 def chi2corr_ind_group(imin,imax):
 
-    for i in range(imin,imax+1):
-        dataset_testii=fit_pars.dataset_40[i] 
-        # print(dataset_testii)
-
     if(chi2_pars.t0):
         cov_gl=dload_pars.covt0
-        covin_gl=dload_pars.covt0_inv
     else:
         cov_gl=dload_pars.covexp
-        covin_gl=dload_pars.covexp_inv
 
     cov_ind=cov_gl[chi2_pars.idat_low_arr[imin]:chi2_pars.idat_up_arr[imax],chi2_pars.idat_low_arr[imin]:chi2_pars.idat_up_arr[imax]]
     cov=cov_ind
@@ -496,12 +201,10 @@ def chi2corr_ind(i):
         # inpt0 = dict(dataset_inputs=dscomb, theoryid=fit_pars.theoryidi, use_cuts="internal", t0pdfset=pdf_pars.PDFlabel, use_t0=True)
         # cov = API.dataset_inputs_t0_covmat_from_systematics(**inpt0)
         cov_gl=dload_pars.covt0
-        covin_gl=dload_pars.covt0_inv
     else:
         # inp = dict(dataset_inputs=dscomb, theoryid=fit_pars.theoryidi, use_cuts="internal")
         # cov = API.dataset_inputs_covmat_from_systematics(**inp)
         cov_gl=dload_pars.covexp
-        covin_gl=dload_pars.covexp_inv
         
     cov_ind=cov_gl[chi2_pars.idat_low_arr[i]:chi2_pars.idat_up_arr[i],chi2_pars.idat_low_arr[i]:chi2_pars.idat_up_arr[i]]
     cov=cov_ind
