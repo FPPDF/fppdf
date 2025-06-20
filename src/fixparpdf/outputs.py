@@ -4,6 +4,7 @@ from reportengine.utils import yaml_safe
 from fixparpdf.global_pars import *
 from fixparpdf.lhapdf_funs import *
 from fixparpdf.pdfs import *
+from fixparpdf.global_pars import shared_global_data
 
 OUTPUT_F = Path("outputs")
 BUFFER_F = OUTPUT_F / "buffer"
@@ -69,12 +70,12 @@ def evgrido():
         pset = lhapdf.getPDFSet(pdf_pars.PDFlabel_lhin)
         pdfs = pset.mkPDFs()
 
-    if fit_pars.theoryidi==211 or fit_pars.theoryidi==40001000 or fit_pars.theoryidi==50001000:
+    thid = shared_global_data["data"].theoryid
+    # TODO: look at the Q directly from the theory
+    if thid in (211, 212, 40001000, 50001000):
         qin=1.00
-    elif fit_pars.theoryidi==200:
+    elif thid in (200, 40000000):
         qin=1.65
-    elif fit_pars.theoryidi==212:
-        qin=1.00
 
     for i, x in enumerate(xgrid.flat):
 

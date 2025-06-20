@@ -1,6 +1,7 @@
 import numpy as np
 
 from fixparpdf.global_pars import *
+from fixparpdf.global_pars import shared_global_data
 from fixparpdf.outputs import BUFFER_F
 
 
@@ -145,14 +146,16 @@ def readin():
 
 
 #   Set charm to zero if p. charm theory!
-    nchm=basis_pars.i_ch_max-basis_pars.i_ch_min    
-    if fit_pars.theoryidi==211 or fit_pars.theoryidi==212 or fit_pars.theoryidi==40001000 or fit_pars.theoryidi==50001000:
+    nchm=basis_pars.i_ch_max-basis_pars.i_ch_min
+    # TODO: ask the theory for intrinsic charm
+    thid = shared_global_data["data"].theoryid
+    if thid in (200, 40000000):
+        distcharm=np.loadtxt(inputfile,skiprows=8+nuv+ndv+nsea+nsp+ng+nsm+ndbub,max_rows=nchm)
+    else:
         if basis_pars.Cheb_8:
             distcharm=np.zeros((11,2))
         else:
             distcharm=np.zeros((9,2))
-    elif fit_pars.theoryidi==200:
-        distcharm=np.loadtxt(inputfile,skiprows=8+nuv+ndv+nsea+nsp+ng+nsm+ndbub,max_rows=nchm)
 
     ntot=4+nuv+ndv+nsea+nsp+ng+nsm+ndbub+nchm
     basis_pars.n_pars=ntot
@@ -230,10 +233,8 @@ def readin_Cheb8():
         distcharm=np.loadtxt(inputfile,skiprows=68,max_rows=9)
 
 #   Set charm to zero if p. charm theory!
-    if fit_pars.theoryidi==211 or fit_pars.theoryidi==40001000 or fit_pars.theoryidi==50001000:
-        distcharm=np.zeros((9,2))
-
-    if fit_pars.theoryidi==212:
+    thid = shared_global_data["data"].theoryid
+    if thid in (211, 212, 40001000, 50001000):
         distcharm=np.zeros((9,2))
 
     # disttot=np.vstack([distuv,distdv,distsea,distsp,distg,distsm,distdbub])

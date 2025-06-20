@@ -38,7 +38,7 @@ class Chi2Pars:
     # number of data points - set in code
     ndat = 0
     # Only use t0 for chi2i and chi2o in levmar (i.e. no derivatives at all)
-    t0_noderivin = False
+    t0_noderivin = True
     # global flag (initiator flag above)
     t0_noderiv = False
     # if true add diagonal elements of hessian from positivity (if used) - set to false for final output
@@ -72,7 +72,7 @@ class Chi2Pars:
 @dataclasses.dataclass
 class BasisPars:
     # If true then two term gluon parameterisation used
-    g_second_term:bool = False
+    g_second_term:bool = True
     # if true and g_second_term=False then includes 7th Chebyshev for gluon
     g_cheb7:bool = False
     # If true then delta_S+ set to that of sea
@@ -103,6 +103,26 @@ class BasisPars:
     # Number pars
     n_pars:int = 0
 
+    def __post_init__(self):
+        if self.Cheb_8:
+            self.i_uv_min = 0
+            self.i_uv_max += 2
+            self.i_dv_max += 4
+            self.i_sea_max += 6
+            self.i_sp_max += 8
+            self.i_g_max += 10
+            self.i_sm_max += 10
+            self.i_dbub_max += 12
+            self.i_ch_max += 14
+            self.i_dv_min = self.i_uv_max
+            self.i_sea_min = self.i_dv_max
+            self.i_sp_min = self.i_sea_max
+            self.i_g_min = self.i_sp_max
+            self.i_sm_min = self.i_g_max
+            self.i_dbub_min = self.i_sm_max
+            self.i_ch_min = self.i_dbub_max
+
+
 
 @dataclasses.dataclass
 class MinPars:
@@ -117,10 +137,10 @@ class PDFPars:
     #
     # use external LHAPDF grid as input
     lhin:bool = False
-    uselha: bool = False
+    # if true then scatters when doing direct PDF pd fit
     pdfscat: bool = False
     # labels PDF set for theory evaluation - used internally, value here arbitrary
-    pdflabel:str = 'init'
+    pdflabel:str = None
     # labels central PDF (with no parameter variations in fit for each iteration)
     PDFlabel_cent:str = 'init'
     #  if true then do direct fit to PDF pseudodata
@@ -216,16 +236,31 @@ class DloadPars:
     tchi_newton = 0.0
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class InoutPars:
-    # labels output files, value here abitrary
+    """
+
+    Parameters
+    ----------
+        inputnam: str
+            Input file with the PDF parameters
+        label: str
+            Label for the output files
+
+        covinput: str
+            File from where to read the covariance matrix if readcov = True
+        readcov: bool
+        
+    """
+    # Name of pdf parameter inputnam, value here arbitrary
+    inputnam:str
+    # labels ofr output files
     label: str = 'init'
-    # name of pdf parameter inputnam, value here arbitrary
-    inputnam:str = 'init'
+    # name of covariance matrix inputnam, if used, value here arbitrary
+    covinput:str = None
     # if true then read in covariance matrix and evaluate PDF errors
     readcov:bool = False
-    # name of covariance matrix inputnam, if used, value here arbitrary
-    covinput:str = 'init'
+
     # if true then write pseudodata out to file
     pdout:bool = False
     # if true then write pseudodata out to file
@@ -241,11 +276,13 @@ class InoutPars:
         return f"{self.label}_irep{self.replica:04}"
 
 
-class fit_pars:
+@dataclasses.dataclass
+class FitPars:
+    """
+    Fit Level parameters
+    """
     # run with fixed input parameters (override input card flags)
-    fixpar = True
-    # NNPDF theory id (211 = NNLO pch)
-    theoryidi = 211
+    fixpar: bool = False
     # impose NNPDF positivity in fit
     nnpdf_pos = False
     # positivity constraint flag (set in code)
@@ -1084,6 +1121,7 @@ class DataHolder:
     """
 
     datasets: tuple
+    theoryid: int = 40_000_000
     # NOTE: intersection cuts are being ignored, but should've been added upon construction
 
     @cached_property
@@ -1161,9 +1199,9 @@ sensible_positivity_cuts = [
 ]
 
 
-def shared_populate_data():
+def shared_populate_data(theoryid = 40001000):
 
-    config = {"theoryid": fit_pars.theoryidi, "use_cuts": "internal"}
+    config = {"theoryid": theoryid, "use_cuts": "internal"}
 
     datasets = []
     for dinput in fit_pars.dataset_40:
@@ -1176,14 +1214,13 @@ def shared_populate_data():
         added_filter_rules=sensible_positivity_cuts
     )
 
-    shared_global_data["data"] = DataHolder(tuple(datasets))
-    shared_global_data["posdata"] = DataHolder(tuple(positivity_datasets))
+    shared_global_data["data"] = DataHolder(tuple(datasets), theoryid=theoryid)
+    shared_global_data["posdata"] = DataHolder(tuple(positivity_datasets),theoryid=theoryid)
 
 
 # Instantiate all global configurations
 # Change this perhaps to a namedtuple or something better
 global_configuration = {
-    "chi2": Chi2Pars(),
     "min": MinPars(),
     "closure": PDFClosure(),
     "dload": DloadPars(),
@@ -1191,7 +1228,7 @@ global_configuration = {
 # basis_pars = None
 # pdf_pars = None
 # inout_pars = None
-chi2_pars = global_configuration["chi2"]
 min_pars = global_configuration["min"]
 pdf_closure = global_configuration["closure"]
 dload_pars = global_configuration["dload"]
+fit_pars = FitPars()

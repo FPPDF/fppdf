@@ -1,6 +1,5 @@
 from validphys.api import API
 import numpy as np
-import os
 from scipy.optimize import minimize
 from reportengine.utils import yaml_safe
 import time
@@ -22,35 +21,39 @@ with open(args.config, 'r') as file:
     config = yaml_safe.load(file)
 
 # Read the necessary inputs
-_input_config = config.get("inputs", {})
+_input_config = config.get("inout_parameters", {})
 _basis_config = config.get("basis pars", {})
 _pdf_pars = config.get("pdf pars", {})
+_chi2_pars = config.get("chi2_parameters", {})
+
+# Remove deprecated parameters just in case
+_pdf_pars.pop("uselha", None)
 
 # Add extra flags that go into the input
-_output_config = config.get("outputs", {})
 _pseudodata_config = config.get("pseudodata flags", None)
-_input_config["label"] = _output_config.get("label")
-_input_config["pdout"] = _pseudodata_config.get("pdfout")
-_input_config["pdin"] = _pseudodata_config.get("pdin")
-_input_config["pd_output"] = _pseudodata_config.get("pd_output", False)
+if _pseudodata_config:
+    _input_config["pdout"] = _pseudodata_config.get("pdfout")
+    _input_config["pdin"] = _pseudodata_config.get("pdin")
+    _input_config["pd_output"] = _pseudodata_config.get("pd_output", False)
 
 _pdf_closure_config = config.get("pdf closure", {})
-_pdf_pars["pdfscat"] = _pdf_closure_config.get("pdfscat")
-_pdf_pars["pdflabel"] = _pdf_closure_config.get("pdflabel")
-_pdf_pars["pdpdf"] = _pdf_closure_config.get("pdpdf")
+if _pdf_closure_config:
+    _pdf_pars["pdfscat"] = _pdf_closure_config.get("pdfscat", False)
+    _pdf_pars["pdflabel"] = _pdf_closure_config.get("pdflabel")
+    _pdf_pars["pdpdf"] = _pdf_closure_config.get("pdpdf", False)
 
 # Instantiate the global configuration
 global_pars.inout_pars = inout_pars = global_pars.InoutPars(**_input_config)
-global_pars.basis_pars = basis_pars = global_pars.BasisPars(**_basis_config)
+global_pars.basis_pars = global_pars.BasisPars(**_basis_config)
 global_pars.pdf_pars = global_pars.PDFPars(**_pdf_pars)
+global_pars.chi2_pars = global_pars.Chi2Pars(**_chi2_pars)
 
 # In the ones below things are not always in the expected place
 fitp = config.get("fit pars", {})
 
-chi2_pars = global_pars.chi2_pars
-chi2_pars.t0_noderivin = fitp.get("t0_noderivin")
-chi2_pars.dynamic_tol = fitp.get("dynamic_tol", False)
-chi2_pars.t2_err = fitp.get("t2_err", 1.0)
+# Some quick checks
+if global_pars.pdf_pars.lhin != global_pars.fit_pars.fixpar:
+    raise ValueError
 
 
 from fixparpdf.global_pars import *
@@ -64,26 +67,6 @@ from fixparpdf.levmar import *
 from fixparpdf.lhapdf_funs import *
 from fixparpdf.error_calc import *
 
-if basis_pars.Cheb_8:
-    basis_pars.i_uv_min = 0
-    basis_pars.i_uv_max += 2
-    basis_pars.i_dv_max += 4
-    basis_pars.i_sea_max += 6
-    basis_pars.i_sp_max += 8
-    basis_pars.i_g_max += 10
-    basis_pars.i_sm_max += 10
-    basis_pars.i_dbub_max += 12
-    basis_pars.i_ch_max += 14
-    basis_pars.i_dv_min = basis_pars.i_uv_max
-    basis_pars.i_sea_min = basis_pars.i_dv_max
-    basis_pars.i_sp_min = basis_pars.i_sea_max
-    basis_pars.i_g_min = basis_pars.i_sp_max
-    basis_pars.i_sm_min = basis_pars.i_g_max
-    basis_pars.i_dbub_min = basis_pars.i_sm_max
-    basis_pars.i_ch_min = basis_pars.i_dbub_max
-
-fit_pars.fixpar = fitp.get("fixpar")
-fit_pars.theoryidi = fitp.get("theoryidi")
 fit_pars.nnpdf_pos = fitp.get("nnpdf_pos")
 fit_pars.pos_40 = fitp.get("pos_40")
 fit_pars.pos_nogluon = fitp.get("pos_nogluon")
@@ -202,10 +185,6 @@ if inout_pars.pd_output:
     inout_pars.pd_output_lab = inout_pars.label
     inout_pars.label += '_irep' + str(fit_pars.irep)
 
-if fit_pars.theoryidi == 212:
-    fit_pars.dataset_40 = fit_pars.dataset_40_nlo
-    fit_pars.imaxdat = len(fit_pars.dataset_40)
-
 profile = _get_nnpdf_profile(None)
 fit_pars.datapath = pathlib.Path(profile["data_path"])
 # fit_pars.theories_path=pathlib.Path(profile["theories_path"])
@@ -214,9 +193,6 @@ fit_pars.newmin = True
 
 if inout_pars.pdin:
     inout_pars.pdout = False
-
-if pdf_pars.lhin:
-    fit_pars.fixpar = True
 
 fit_pars.alphas = 0.118
 

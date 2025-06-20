@@ -6,6 +6,7 @@ import numpy as np
 
 import fixparpdf.chebyshevs as cheb
 from fixparpdf.global_pars import *
+from fixparpdf.global_pars import shared_global_data
 
 try:
     from scipy.integrate import quadrature
@@ -399,33 +400,15 @@ def Phi_msht_int():
     xmin = 1e-6
     xmax = 0.5
 
-    if (
-        fit_pars.theoryidi == 211
-        or fit_pars.theoryidi == 40001000
-        or fit_pars.theoryidi == 50001000
-    ):
-        pdfmax = 8
-    else:
-        pdfmax = 9
-
-    if (
-        fit_pars.theoryidi == 211
-        or fit_pars.theoryidi == 40001000
-        or fit_pars.theoryidi == 50001000
-    ):
+    thid = shared_global_data["data"].theoryid
+    if thid in (211, 40001000, 50001000):
         pdfmax = 3
     else:
         pdfmax = 4
 
     out = []
 
-    # for pdfi in range (1,pdfmax):
-    #     print(pdfi)
-    #     outi=quadrature(arclength_msht,xmin,xmax,args=(pdfi,),rtol=1.0e-04,maxiter=5000)[0]
-    #     out=np.append(outi,out)
-
     for pdfi in range(-pdfmax, pdfmax + 1):
-        print(pdfi)
         outi = quadrature(arclength_msht, xmin, xmax, args=(pdfi,), rtol=1.0e-04, maxiter=5000)[0]
         out = np.append(outi, out)
 
