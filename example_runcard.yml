@@ -1,0 +1,72 @@
+# 
+# Runcard for fixparpdf
+#
+# The dataset definition, cuts and replica generation follows 
+# closely the NNPDF syntax to ease comparisons
+#
+
+dataset_inputs:
+- {dataset: HERA_NC_318GEV_EM-SIGMARED, frac: 0.75, variant: legacy}
+# - {dataset: HERA_NC_225GEV_EP-SIGMARED, frac: 0.75, variant: legacy}
+# - {dataset: HERA_NC_251GEV_EP-SIGMARED, frac: 0.75, variant: legacy}
+# - {dataset: HERA_NC_300GEV_EP-SIGMARED, frac: 0.75, variant: legacy}
+# - {dataset: HERA_NC_318GEV_EP-SIGMARED, frac: 0.75, variant: legacy}
+# - {dataset: HERA_CC_318GEV_EM-SIGMARED, frac: 0.75, variant: legacy}
+# - {dataset: HERA_CC_318GEV_EP-SIGMARED, frac: 0.75, variant: legacy}
+# - {dataset: HERA_NC_318GEV_EAVG_CHARM-SIGMARED, frac: 0.75, variant: legacy}
+# - {dataset: HERA_NC_318GEV_EAVG_BOTTOM-SIGMARED, frac: 0.75, variant: legacy}
+
+posdatasets:
+  # Positivity Lagrange Multiplier
+  - {dataset: NNPDF_POS_2P24GEV_F2U, maxlambda: 1e6}
+  - {dataset: NNPDF_POS_2P24GEV_F2D, maxlambda: 1e6}
+  - {dataset: NNPDF_POS_2P24GEV_F2S, maxlambda: 1e6}
+  - {dataset: NNPDF_POS_2P24GEV_FLL, maxlambda: 1e6}
+  - {dataset: NNPDF_POS_2P24GEV_DYU, maxlambda: 1e10}
+  - {dataset: NNPDF_POS_2P24GEV_DYD, maxlambda: 1e10}
+  - {dataset: NNPDF_POS_2P24GEV_DYS, maxlambda: 1e10}
+  - {dataset: NNPDF_POS_2P24GEV_F2C, maxlambda: 1e6}
+  # Positivity of MSbar PDFs
+  - {dataset: NNPDF_POS_2P24GEV_XUQ, maxlambda: 1e6}
+  - {dataset: NNPDF_POS_2P24GEV_XUB, maxlambda: 1e6}
+  - {dataset: NNPDF_POS_2P24GEV_XDQ, maxlambda: 1e6}
+  - {dataset: NNPDF_POS_2P24GEV_XDB, maxlambda: 1e6}
+  - {dataset: NNPDF_POS_2P24GEV_XSQ, maxlambda: 1e6}
+  - {dataset: NNPDF_POS_2P24GEV_XSB, maxlambda: 1e6}
+  - {dataset: NNPDF_POS_2P24GEV_XGL, maxlambda: 1e6}
+
+# Apply a cut to a dataset or process type, in this case to the positivity dataset `NNPDF_POS_2P24GEV_XGL` which has process type: POS_XPDF
+added_filter_rules:
+    - process_type: POS_XPDF
+      rule: "x > 0.1"
+
+t0pdfset: NNPDF40_nnlo_as_01180 # PDF set to generate t0 covmat
+
+# pch
+theoryid: 40_001_000 # Downloads the theory (grids and evolution) from NNPDF server
+
+# true = generate MC replicas, false = use real data
+genrep: False
+mcseed: 1
+
+# Seed for the training/validation split
+trvlseed: 1
+
+# Fixpar specific parameters
+inout_parameters:
+#   inputnam: input_mshtfit_publication_shortmin.dat
+  inputnam: inputdef_2parfree.dat 
+  # label for output files
+  label: fitout_dis_only
+#   # input covariance matrix file (if used)
+#   covinput: newmin_final_remin_out.dat
+#   # if true then read in covariance matrix and evaluate PDF errors
+#   readcov: False
+
+fit_parameters:
+  # run with fixed input parameters
+  fixpar: False
+  # impose NNPDF positivity in fit
+  nnpdf_pos: False
+  # if true then generates a replica from baseline dataset with seed irep
+  pseud: False

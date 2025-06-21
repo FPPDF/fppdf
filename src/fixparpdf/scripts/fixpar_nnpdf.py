@@ -25,6 +25,7 @@ _input_config = config.get("inout_parameters", {})
 _basis_config = config.get("basis pars", {})
 _pdf_pars = config.get("pdf pars", {})
 _chi2_pars = config.get("chi2_parameters", {})
+_fit_pars = config.get("fit_parameters", {})
 
 # Remove deprecated parameters just in case
 _pdf_pars.pop("uselha", None)
@@ -42,19 +43,22 @@ if _pdf_closure_config:
     _pdf_pars["pdflabel"] = _pdf_closure_config.get("pdflabel")
     _pdf_pars["pdpdf"] = _pdf_closure_config.get("pdpdf", False)
 
+_full_dataset = config["dataset_inputs"]
+_pos_dataset = config["posdatasets"]
+_fit_pars["dataset_40"] = _full_dataset
+_fit_pars["pos_data40"] = _pos_dataset
+
 # Instantiate the global configuration
 global_pars.inout_pars = inout_pars = global_pars.InoutPars(**_input_config)
 global_pars.basis_pars = global_pars.BasisPars(**_basis_config)
 global_pars.pdf_pars = global_pars.PDFPars(**_pdf_pars)
 global_pars.chi2_pars = global_pars.Chi2Pars(**_chi2_pars)
 
-# In the ones below things are not always in the expected place
-fitp = config.get("fit pars", {})
+fit_pars = global_pars.fit_pars = global_pars.FitPars(**_fit_pars)
 
 # Some quick checks
 if global_pars.pdf_pars.lhin != global_pars.fit_pars.fixpar:
     raise ValueError
-
 
 from fixparpdf.global_pars import *
 from fixparpdf.outputs import *
@@ -67,35 +71,17 @@ from fixparpdf.levmar import *
 from fixparpdf.lhapdf_funs import *
 from fixparpdf.error_calc import *
 
-fit_pars.nnpdf_pos = fitp.get("nnpdf_pos")
-fit_pars.pos_40 = fitp.get("pos_40")
-fit_pars.pos_nogluon = fitp.get("pos_nogluon")
-if fit_pars.pos_nogluon is None:
-    fit_pars.pos_nogluon = False
-fit_pars.pos_gluononly = fitp.get("pos_gluononly")
-if fit_pars.pos_gluononly is None:
-    fit_pars.pos_gluononly = False
-fit_pars.pos_dyc = fitp.get("pos_dyc")
-if fit_pars.pos_dyc is None:
-    fit_pars.pos_dyc = False
-fit_pars.pseud = fitp.get("pseud")
-fit_pars.irep = fitp.get("irep")
+fitp = {}
+fit_pars.irep = fitp.get("irep", 0)
 fit_pars.lhrep = fitp.get("lhrep")
 if fit_pars.lhrep is None:
     fit_pars.lhrep = 0
-fit_pars.nmcpd_diag = fitp.get("nmcpd_diag")
-fit_pars.lampos = fitp.get("lampos", 1e3)
-fit_pars.deld_const = fitp.get("deld_const")
-fit_pars.dset_type = fitp.get("dset_type")
 tollm = fitp.get("tollm")
 if tollm is not None:
     min_pars.tollm = tollm
 fit_pars.nlo_cuts = fitp.get("nlo_cuts")
 if fit_pars.nlo_cuts is None:
     fit_pars.nlo_cuts = False
-
-# Make sure that new_min is True
-fit_pars.newmin = True
 
 fit_pars.dynT_group = fitp.get("dynT_group")
 if fit_pars.dynT_group is None:
@@ -105,91 +91,11 @@ fit_pars.dynT_ngt5 = fitp.get("dynT_ngt5")
 if fit_pars.dynT_ngt5 is None:
     fit_pars.dynT_ngt5 = False
 
-if fit_pars.pos_nogluon:
-    fit_pars.pos_data31 = fit_pars.pos_data31_nogluon
-    fit_pars.pos_data40 = fit_pars.pos_data40_nogluon
-
-if fit_pars.pos_gluononly:
-    fit_pars.pos_data31 = fit_pars.pos_data31_gluononly
-    fit_pars.pos_data40 = fit_pars.pos_data40_gluononly
-
-if fit_pars.pos_dyc:
-    fit_pars.pos_40 = False
-    fit_pars.pos_data31 = fit_pars.pos_data31_dyc
-
-if fit_pars.dset_type is None:
-    fit_pars.dset_type = 'global'
-
-if fit_pars.dset_type == 'HERAonly':
-    fit_pars.dataset_40 = fit_pars.dataset_HERAonly
-    fit_pars.imaxdat = len(fit_pars.dataset_40)
-    for i in range(0, fit_pars.imaxdat):
-        fit_pars.cftrue[i] = False
-elif fit_pars.dset_type == 'noHERA':
-    fit_pars.dataset_40 = fit_pars.dataset_noHERA
-    fit_pars.imaxdat = len(fit_pars.dataset_40)
-    for i in range(10, 19):
-        fit_pars.cftrue[i] = True
-    fit_pars.systrue[36] = False
-    fit_pars.systrue[37] = False
-    fit_pars.systrue[57] = False
-    fit_pars.systrue[27] = True
-    fit_pars.systrue[28] = True
-    fit_pars.systrue[48] = True
-elif fit_pars.dset_type == 'noLHC':
-    fit_pars.dataset_40 = fit_pars.dataset_noLHC
-    fit_pars.imaxdat = len(fit_pars.dataset_40)
-elif fit_pars.dset_type == 'hhcollideronly':
-    fit_pars.dataset_40 = fit_pars.dataset_hhcollideronly
-    fit_pars.imaxdat = len(fit_pars.dataset_40)
-    for i in range(0, 8):
-        fit_pars.cftrue[i] = True
-    for i in range(10, 19):
-        fit_pars.cftrue[i] = True
-    fit_pars.systrue[36] = False
-    fit_pars.systrue[37] = False
-    fit_pars.systrue[57] = False
-    fit_pars.systrue[13] = True
-    fit_pars.systrue[14] = True
-    fit_pars.systrue[34] = True
-elif fit_pars.dset_type == 'lowenergyDIS':
-    fit_pars.dataset_40 = fit_pars.dataset_lowenergyDIS
-    fit_pars.imaxdat = len(fit_pars.dataset_40)
-elif fit_pars.dset_type == 'lowenergyDY':
-    fit_pars.dataset_40 = fit_pars.dataset_lowenergyDY
-    fit_pars.imaxdat = len(fit_pars.dataset_40)
-    for i in range(0, 4):
-        fit_pars.cftrue[i] = True
-elif fit_pars.dset_type == 'lowenergyDISDY':
-    fit_pars.dataset_40 = fit_pars.dataset_lowenergyDISDY
-    fit_pars.imaxdat = len(fit_pars.dataset_40)
-    for i in range(10, 19):
-        fit_pars.cftrue[i] = True
-elif fit_pars.dset_type == 'lowenergyDISDY_HERAonly':
-    fit_pars.dataset_40 = fit_pars.dataset_lowenergyDISDY_HERAonly
-    fit_pars.imaxdat = len(fit_pars.dataset_40)
-elif fit_pars.dset_type == 'test':
-    fit_pars.dataset_40 = fit_pars.dataset_test
-    fit_pars.imaxdat = len(fit_pars.dataset_40)
-    for i in range(0, fit_pars.imaxdat):
-        fit_pars.cftrue[i] = False
-elif fit_pars.dset_type == 'global_new':
-    fit_pars.dataset_40 = fit_pars.dataset_40_new
-    fit_pars.imaxdat = len(fit_pars.dataset_40)
-    fit_pars.cftrue = np.zeros((82), dtype=bool)
-    for i in range(0, len(fit_pars.dataset_40)):
-        if "cfac" in fit_pars.dataset_40[i]:
-            fit_pars.cftrue[i] = True
-
 if inout_pars.pd_output:
     inout_pars.pd_output_lab = inout_pars.label
     inout_pars.label += '_irep' + str(fit_pars.irep)
 
 profile = _get_nnpdf_profile(None)
-fit_pars.datapath = pathlib.Path(profile["data_path"])
-# fit_pars.theories_path=pathlib.Path(profile["theories_path"])
-
-fit_pars.newmin = True
 
 if inout_pars.pdin:
     inout_pars.pdout = False

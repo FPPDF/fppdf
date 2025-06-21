@@ -249,16 +249,7 @@ def chi2corr_global(datasets, vp_pdf=None, theta_idx=None):
     # Compute a list of theory predictions for all datasets between imin and imax, for the given PDF
     theorytot = compute_theory(datasets, vp_pdf, theta_idx=theta_idx)
 
-#         # TODO: remove this global state
-#         dataset_testii=fit_pars.dataset_40[i]
-#         fit_pars.preds_stored[str(dataset_testii["dataset"])]=theory
-#         if dload_pars.dflag==1:
-#             chi2_pars.idat_low_arr[i]=chi2_pars.idat
-#             chi2_pars.idat+=len(theory)
-#             chi2_pars.idat_up_arr[i]=chi2_pars.idat
-
     # Get the covmat for all the dataset we have calculated chi2 for. The order is the same as the vector of theories
-    # TODO: in principle nlo intersenction cut should already be part of vp_input at this stage
     cov = shared_global_data["data"].produce_covmat(pdf=vp_pdf, datasets=datasets, use_t0=chi2_pars.t0)
     covin = la.inv(cov)
 
@@ -354,21 +345,6 @@ def chi2corr_global(datasets, vp_pdf=None, theta_idx=None):
     diffs=dattot-theorytot
 
     dload_pars.tharr_gl=theorytot
-
-    if fit_pars.nmcpd_diag:
-
-        ndat_nmcpd=121
-        cov_d=cov.copy()
-
-        for i in range(0,ndat_nmcpd):
-            for j in range(0,ndat_nmcpd):
-                if i==j:
-                    cov_d[i,j]=cov[i,j]
-                else:
-                    cov_d[i,j]=0.
-
-        cov=cov_d.copy()
-
 
     # Compute chi2
     try:
@@ -916,16 +892,11 @@ def jaccalc_d4(label_arr,label_arrm,label_arrm2,label_arrp2,eps_arr,hess_calc,il
     out1=0.
     if fit_pars.pos_const:
         # TODO
+        raise Exception
         import ipdb; ipdb.set_trace()
 #        for ip in range(0,pdf_pars.npar_free+1):                                                                                                              
         pdf_pars.PDFlabel=label_arr[ip].strip()
         out31=pos_calc(fit_pars.pos_data31)
-        if(fit_pars.pos_40):
-            out40=pos_calc(fit_pars.pos_data40)
-            chi2pos=out31+out40
-            out1=chi2pos
-        else:
-            out1=out31
     #            chiarr[ip]=chiarr[ip]+out1    
 
 
@@ -1078,7 +1049,7 @@ def jaccalc_d2(label_arr,label_arrm,eps_arr,hess_calc,il,ih):
     
     out1=0.
     if fit_pars.pos_const:
-        # TODO
+        raise Exception("Not reached")
         import ipdb; ipdb.set_trace()
         chiarr=np.zeros((pdf_pars.npar_free+1))
         chiarrm=np.zeros((pdf_pars.npar_free+1))
