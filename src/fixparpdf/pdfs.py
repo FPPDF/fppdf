@@ -5,8 +5,7 @@ import numba as nb
 import numpy as np
 
 import fixparpdf.chebyshevs as cheb
-from fixparpdf.global_pars import *
-from fixparpdf.global_pars import shared_global_data
+from fixparpdf.global_pars import basis_pars, pdf_pars, shared_global_data
 
 try:
     from scipy.integrate import quadrature
@@ -95,7 +94,7 @@ class MSHTSet(LHAPDFSet):
         """Whether this is a PDF of its derivative"""
         return self._variation is not None
 
-    @cache
+    @functools.cache
     def _xfxQ(self, x: _Hashrray, Q: float, n: int, fl: int):
         """Return the PDF value for one single point for one single member
         Note that in this case both scale (Q) and member (n) are ignored.

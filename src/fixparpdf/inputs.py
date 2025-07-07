@@ -1,7 +1,6 @@
 import numpy as np
 
-from fixparpdf.global_pars import *
-from fixparpdf.global_pars import shared_global_data
+from fixparpdf.global_pars import basis_pars, fit_pars, inout_pars, pdf_pars, shared_global_data
 from fixparpdf.outputs import BUFFER_F
 
 

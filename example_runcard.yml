@@ -40,8 +40,6 @@ added_filter_rules:
     - process_type: POS_XPDF
       rule: "x > 0.1"
 
-t0pdfset: NNPDF40_nnlo_as_01180 # PDF set to generate t0 covmat
-
 # pch
 theoryid: 40_001_000 # Downloads the theory (grids and evolution) from NNPDF server
 

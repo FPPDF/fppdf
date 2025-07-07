@@ -1,10 +1,8 @@
 from validphys.api import API
-import numpy as np
 from scipy.optimize import minimize
 from reportengine.utils import yaml_safe
 import time
 import argparse
-import pathlib
 from validphys.loader import _get_nnpdf_profile
 
 from fixparpdf import global_pars
@@ -51,8 +49,8 @@ _fit_pars["pos_data40"] = _pos_dataset
 # Instantiate the global configuration
 global_pars.inout_pars = inout_pars = global_pars.InoutPars(**_input_config)
 global_pars.basis_pars = global_pars.BasisPars(**_basis_config)
-global_pars.pdf_pars = global_pars.PDFPars(**_pdf_pars)
-global_pars.chi2_pars = global_pars.Chi2Pars(**_chi2_pars)
+global_pars.pdf_pars = pdf_pars = global_pars.PDFPars(**_pdf_pars)
+global_pars.chi2_pars = chi2_pars = global_pars.Chi2Pars(**_chi2_pars)
 
 fit_pars = global_pars.fit_pars = global_pars.FitPars(**_fit_pars)
 
@@ -60,47 +58,22 @@ fit_pars = global_pars.fit_pars = global_pars.FitPars(**_fit_pars)
 if global_pars.pdf_pars.lhin != global_pars.fit_pars.fixpar:
     raise ValueError
 
-from fixparpdf.global_pars import *
-from fixparpdf.outputs import *
-from fixparpdf.inputs import *
-from fixparpdf.pdfs import *
-from fixparpdf.chebyshevs import *
-from fixparpdf.data_theory import *
-from fixparpdf.chi2s import *
-from fixparpdf.levmar import *
-from fixparpdf.lhapdf_funs import *
-from fixparpdf.error_calc import *
+pdf_closure = global_pars.pdf_closure
+min_pars = global_pars.min_pars
+dload_pars = global_pars.dload_pars
 
-fitp = {}
-fit_pars.irep = fitp.get("irep", 0)
-fit_pars.lhrep = fitp.get("lhrep")
-if fit_pars.lhrep is None:
-    fit_pars.lhrep = 0
-tollm = fitp.get("tollm")
-if tollm is not None:
-    min_pars.tollm = tollm
-fit_pars.nlo_cuts = fitp.get("nlo_cuts")
-if fit_pars.nlo_cuts is None:
-    fit_pars.nlo_cuts = False
-
-fit_pars.dynT_group = fitp.get("dynT_group")
-if fit_pars.dynT_group is None:
-    fit_pars.dynT_group = False
-
-fit_pars.dynT_ngt5 = fitp.get("dynT_ngt5")
-if fit_pars.dynT_ngt5 is None:
-    fit_pars.dynT_ngt5 = False
-
-if inout_pars.pd_output:
-    inout_pars.pd_output_lab = inout_pars.label
-    inout_pars.label += '_irep' + str(fit_pars.irep)
+# WARNING
+# Since global_pars is imported by various of the modules below, they cannot be imported
+# until the global pars are set
+# TODO: lift the entire config out 
+from fixparpdf.outputs import gridout, parsout, plotout, evgrido, resout, resout_nofit
+from fixparpdf.inputs import readincov, readin
+from fixparpdf.levmar import levmar
+from fixparpdf.pdfs import initpars, parset, sumrules, MSHTPDF
+from fixparpdf.chi2s import chi2min
+from fixparpdf.error_calc import hesserror_new, hesserror_dynamic_tol_new
 
 profile = _get_nnpdf_profile(None)
-
-if inout_pars.pdin:
-    inout_pars.pdout = False
-
-fit_pars.alphas = 0.118
 
 tzero = time.process_time()
 
@@ -108,7 +81,7 @@ print('inputnam = ', inout_pars.inputnam)
 
 
 ##### TODO: start populating the shared data here
-shared_populate_data()
+global_pars.shared_populate_data()
 
 if inout_pars.readcov:
     chi2_pars.t0 = True
@@ -436,6 +409,3 @@ else:
     resout(pospeni, pospenf, chi2t0i, chi2expi, chi2t0f, chi2expf, chi2_pars.ndat)
     t1 = time.process_time()
     print('time= ', t1 - tzero)
-
-
-# TODO Remove TEMP_LHAPDF at the end

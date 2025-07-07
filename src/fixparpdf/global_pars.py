@@ -8,16 +8,16 @@ They are all frozen and instantiated as the runcards are read.
 # TODO 2: change the comments to doscstrings (probably can be automated as well)
 
 import dataclasses
-import os
 from functools import cache, cached_property
+import os
 
 from nnpdf_data.validphys_compatibility import legacy_to_new_map
 import numpy as np
 from validphys.api import API
 from validphys.convolution import central_predictions
 from validphys.covmats import dataset_inputs_covmat_from_systematics
-from validphys.pseudodata import make_replica
 from validphys.lhaindex import get_lha_datapath
+from validphys.pseudodata import make_replica
 
 
 @dataclasses.dataclass
@@ -102,6 +102,9 @@ class BasisPars:
     Cheb_8:bool = False
     # Number pars
     n_pars:int = 0
+
+    # TODO: should this class be just fixed constants?
+    # why can it change?
 
     def __post_init__(self):
         if self.Cheb_8:
@@ -269,6 +272,10 @@ class InoutPars:
     pd_output:bool = False
     replica: int = None
 
+    def __post_init__(self):
+        if self.pdin:
+            self.pdout = False
+
     @property
     def pdf_output_lab(self):
         if self.replica is None:
@@ -304,11 +311,13 @@ class FitPars:
     # global positivity lambda
     lampos:bool = 1e3
     # If true then group datasets together for dynamic tolerance
-    dynT_group:bool = True
+    dynT_group:bool = False
     # If true then remove datasets with n < 5 from dynamic tolerance
-    dynT_ngt5:bool = True
+    dynT_ngt5:bool = False
     # positivity constraint flag (set in code)
-    pos_const = False # TODO: never set by input
+    pos_const:bool = False # TODO: never set by input
+    # deprecated
+    nlo_cuts: bool = False
 
     @property
     def imaxdat(self):

@@ -9,8 +9,6 @@ from math import gamma
 import numba as nb
 import numpy as np
 
-from fixparpdf.global_pars import *
-
 
 @nb.njit
 def I(a, b):
