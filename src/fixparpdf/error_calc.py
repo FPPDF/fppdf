@@ -551,6 +551,7 @@ def hesserror_new(afi,hess,jaci):
             print(eig0)
 
             print('delpar = ',afin-af)
+            # by calling chi2min(afin) we are also updating the free parameter pdf_pars.pdfparsi
             chi2t=chi2min(afin) 
             delchi2t=chi2t-chi0
             print('chidel=',delchi2t)

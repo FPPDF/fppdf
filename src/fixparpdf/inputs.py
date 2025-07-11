@@ -5,7 +5,11 @@ from fixparpdf.outputs import BUFFER_F
 
 
 def readincov():
-
+    """Use ``np.loadtxt`` to read the file outputs/cov/file.dat produced after a fit,
+    specified in the runcard in inout_parameters.covinput
+    It returns the values of the free parameters at the end of the fit, 
+    the hessian matrix and the jacobian.
+    """
     basis_pars.n_pars=73
     if basis_pars.Cheb_8:
          basis_pars.n_pars=73+14
@@ -30,7 +34,6 @@ def readincov():
             afin=np.append(afin,pdf_pars.parsin[i])
             pdf_pars.npar_free+=1
             pdf_pars.par_free_i=np.append(pdf_pars.par_free_i,i)
-
     afin=np.delete(afin,0)
     pdf_pars.par_free_i=np.delete(pdf_pars.par_free_i,0)
 
