@@ -76,6 +76,9 @@ def chi2min_fun(afree, jac_calc=False, hess_calc=False, vp_pdf=None):
         return (out, jac, hess, err, hessp)
 
     # TODO: do we need to set up these variables?
+    # I think this is required in error_calc, to update the free parameters 
+    # corresponding to a specific eigenvalue variation before printing the corresponding grid.
+
     pdf_pars.pdfparsi = pdf_parameters
 
     if vp_pdf is None:
