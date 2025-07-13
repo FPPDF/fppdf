@@ -29,7 +29,7 @@ packages = [
 # The fixparpdf script does the central PDF determination at the initial scale
 fixparpdf = "fixparpdf.scripts.fixparpdf_exec:main"
 # Hesianerr produces the hessian errors
-#hessianerr = "fixparpdf.scripts.hessianerr_exec:main"
+hessianerr = "fixparpdf.scripts.hessianerr_exec:main"
 # fixpar_evolve takes a folder of .exportgrids and produces the corresponding LHAPDF grid 
 #fixpar_evolve = "fixparpdf.scripts.evolvepdf_exec:main"
 

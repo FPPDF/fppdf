@@ -44,9 +44,9 @@ class Chi2Pars:
     # if true add diagonal elements of hessian from positivity (if used) - set to false for final output
     add_hessp = False
     # use dynamic tolerance
-    dynamic_tol = False
+    dynamic_tol:bool = False
     # T^2 value for error calculation
-    t2_err = 1.0
+    t2_err:float = 1.0
     # pos chi_0
     chi_pos0 = 0.0
     # pos chi_1
