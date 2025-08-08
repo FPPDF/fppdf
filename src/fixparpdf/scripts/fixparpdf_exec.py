@@ -1,37 +1,12 @@
 #!/usr/bin/env python3
 
 from argparse import ArgumentParser, ArgumentTypeError
-from pathlib import Path
 import subprocess as sp
 import time
 
 from reportengine.utils import yaml_safe
+from fixparpdf.utils import _existing_path, init_global_pars
 
-from fixparpdf import global_pars
-
-
-def _existing_path(value):
-    value_path = Path(value)
-    if not value_path.exists():
-        return ArgumentTypeError(f"Could not find {value_path}")
-    return value_path
-
-
-def _hessian_error_calculation():
-    """Compute the hessian error with or without dynamic tolerance"""
-    # TODO: to be tested
-    from fixparpdf.error_calc import hesserror_dynamic_tol_new, hesserror_new
-    from fixparpdf.global_pars import chi2_pars, fit_pars
-    from fixparpdf.inputs import readincov
-
-    chi2_pars.t0 = True
-    fit_pars.pos_const = fit_pars.nnpdf_pos
-    (afi, hess, jac) = readincov()
-    if chi2_pars.dynamic_tol:
-        hesserror_dynamic_tol_new(afi, hess, jac)
-    else:
-        hesserror_new(afi, hess, jac)
-    print("finished!")
 
 
 def _no_free_parameters(vp_pdf):
@@ -96,53 +71,17 @@ def main():
     #     sp.run(["python3", fixpar_script.as_posix(), "--config", args.runcard.as_posix()])
 
     ##################
+
     config = yaml_safe.load(args.runcard.open("r"))
-
-    # Read the necessary inputs
-    _input_config = config.get("inout_parameters", {})
-    _basis_config = config.get("basis pars", {})
-    _pdf_pars = config.get("pdf pars", {})
-    _chi2_pars = config.get("chi2_parameters", {})
-    _fit_pars = config.get("fit_parameters", {})
-
-    # Add extra flags that go into the input
-    _pseudodata_config = config.get("pseudodata flags", None)
-    if _pseudodata_config:
-        _input_config["pdout"] = _pseudodata_config.get("pdfout")
-        _input_config["pdin"] = _pseudodata_config.get("pdin")
-        _input_config["pd_output"] = _pseudodata_config.get("pd_output", False)
-
-    _pdf_closure_config = config.get("pdf closure", {})
-    if _pdf_closure_config:
-        _pdf_pars["pdfscat"] = _pdf_closure_config.get("pdfscat", False)
-        _pdf_pars["pdflabel"] = _pdf_closure_config.get("pdflabel")
-        _pdf_pars["pdpdf"] = _pdf_closure_config.get("pdpdf", False)
-
-    _full_dataset = config["dataset_inputs"]
-    _pos_dataset = config["posdatasets"]
-    _fit_pars["dataset_40"] = _full_dataset
-    _fit_pars["pos_data40"] = _pos_dataset
-
-    # Instantiate the global configuration
-    global_pars.basis_pars = global_pars.BasisPars(**_basis_config)
-    global_pars.inout_pars = inout_pars = global_pars.InoutPars(**_input_config)
-    global_pars.pdf_pars = pdf_pars = global_pars.PDFPars(**_pdf_pars)
-    global_pars.chi2_pars = chi2_pars = global_pars.Chi2Pars(**_chi2_pars)
-    global_pars.fit_pars = fit_pars = global_pars.FitPars(**_fit_pars)
-    # Take a reference to the ones with default values
-    pdf_closure = global_pars.pdf_closure
-    dload_pars = global_pars.dload_pars
-
-    if global_pars.pdf_pars.lhin != global_pars.fit_pars.fixpar:
-        raise ValueError("Both pdf_pars::lhin and fit_pars::fixpar must have the same value")
-
-    # Populate the share data
-    # TODO: this can take _full_dataset so that it doesn't go into _fit_pars
-    global_pars.shared_populate_data()
+    # init global variables
+    init_global_pars(config)
+    # import global variables to be used in this module
+    from fixparpdf.global_pars import inout_pars, pdf_pars, chi2_pars, fit_pars, pdf_closure, dload_pars
 
     tzero = time.process_time()
     print(tzero)
 
+    # this can be removed
     if inout_pars.readcov:
         return _hessian_error_calculation()
 

@@ -56,10 +56,11 @@ inout_parameters:
   inputnam: inputdef_2parfree.dat 
   # label for output files
   label: fitout_dis_only
-#   # input covariance matrix file (if used)
-#   covinput: newmin_final_remin_out.dat
-#   # if true then read in covariance matrix and evaluate PDF errors
-#   readcov: False
+  # input covariance matrix file (if used)
+  covinput: fitout_dis_only.dat
+  # if true then read in covariance matrix and evaluate PDF errors.
+  # After separating fitting and hessianerr scripts this can probably be dropped
+  readcov: False
 
 fit_parameters:
   # run with fixed input parameters
@@ -68,3 +69,7 @@ fit_parameters:
   nnpdf_pos: False
   # if true then generates a replica from baseline dataset with seed irep
   pseud: False
+
+chi2_parameters:
+  dynamic_tol: False
+  t2_err: 1.0

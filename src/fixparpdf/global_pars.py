@@ -453,9 +453,11 @@ global_configuration = {
     "closure": PDFClosure(),
     "dload": DloadPars(),
 }
-# basis_pars = None
-# pdf_pars = None
-# inout_pars = None
+basis_pars = None
+pdf_pars = None
+inout_pars = None
+fit_pars = None
+chi2_pars = None
 min_pars = global_configuration["min"]
 pdf_closure = global_configuration["closure"]
 dload_pars = global_configuration["dload"]
