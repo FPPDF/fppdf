@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 
-from argparse import ArgumentParser, ArgumentTypeError
-from pathlib import Path
-import subprocess as sp
+from argparse import ArgumentParser
 import time
 
 from reportengine.utils import yaml_safe
 
-from fixparpdf import global_pars  
-from fixparpdf.utils import _existing_path, init_global_pars
+from fixparpdf.utils import existing_path, init_global_pars
 
 
 
@@ -33,10 +30,10 @@ def main():
 
     parser = ArgumentParser()
 
-    parser.add_argument("runcard", type=_existing_path, help="Runcard defining the run")
+    parser.add_argument("runcard", type=existing_path, help="Runcard defining the run")
    
     parser.add_argument(
-        "--config", type=_existing_path, help="Configuration file to override default parameters"
+        "--config", type=existing_path, help="Configuration file to override default parameters"
     )
     args = parser.parse_args()
 

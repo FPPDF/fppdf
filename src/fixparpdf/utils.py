@@ -2,11 +2,12 @@
 Common functions to fixparpdf and hessianerr scripts
 """
 
+from argparse import ArgumentTypeError
 from pathlib import Path
 from fixparpdf import global_pars
 
 
-def _existing_path(value):
+def existing_path(value):
     value_path = Path(value)
     if not value_path.exists():
         return ArgumentTypeError(f"Could not find {value_path}")
@@ -36,9 +37,13 @@ def init_global_pars(config):
         _pdf_pars["pdpdf"] = _pdf_closure_config.get("pdpdf", False)
 
     _full_dataset = config["dataset_inputs"]
-    _pos_dataset = config["posdatasets"]
+    _pos_dataset = config.get("posdatasets", [])
     _fit_pars["dataset_40"] = _full_dataset
     _fit_pars["pos_data40"] = _pos_dataset
+
+    # Fill default labels:
+    label = _input_config.setdefault("label", "init")
+    _input_config.setdefault("covinput", f"{label}.dat")
 
     # Instantiate the global configuration
     global_pars.basis_pars = global_pars.BasisPars(**_basis_config)

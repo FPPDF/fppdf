@@ -71,6 +71,8 @@ def pos_calc(pdata, vp_pdf, theta_idx=None) -> np.ndarray:
     Returns the contribution to be included in a loss function:
         lambda*PosPenalty
     """
+    if not pdata:
+        return 0.0
     lam = fit_pars.lampos
     ret = compute_theory(pdata, vp_pdf, theta_idx=theta_idx)
 

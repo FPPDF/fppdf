@@ -276,6 +276,10 @@ class InoutPars:
         if self.pdin:
             self.pdout = False
 
+        # If the covinput is not filled, automatically fill it from the label
+        if self.covinput is None:
+            self.covinput = f"{self.label}.dat"
+
     @property
     def pdf_output_lab(self):
         if self.replica is None:

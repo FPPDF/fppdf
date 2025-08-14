@@ -5,7 +5,7 @@ import subprocess as sp
 import time
 
 from reportengine.utils import yaml_safe
-from fixparpdf.utils import _existing_path, init_global_pars
+from fixparpdf.utils import existing_path, init_global_pars
 
 
 
@@ -60,9 +60,9 @@ def _no_free_parameters(vp_pdf):
 def main():
     parser = ArgumentParser()
 
-    parser.add_argument("runcard", type=_existing_path, help="Runcard defining the run")
+    parser.add_argument("runcard", type=existing_path, help="Runcard defining the run")
     parser.add_argument(
-        "--config", type=_existing_path, help="Configuration file to override default parameters"
+        "--config", type=existing_path, help="Configuration file to override default parameters"
     )
     args = parser.parse_args()
 
