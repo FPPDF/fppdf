@@ -27,11 +27,13 @@ packages = [
 
 [tool.poetry.scripts]
 # The fixparpdf script does the central PDF determination at the initial scale
-fixparpdf = "fixparpdf.scripts.fixparpdf_exec:main"
+fixpar_fitpdf = "fixparpdf.scripts.fixparpdf_exec:main"
 # Hesianerr produces the hessian errors
-hessianerr = "fixparpdf.scripts.hessianerr_exec:main"
+fixpar_hessianerr = "fixparpdf.scripts.hessianerr_exec:main"
 # fixpar_evolve takes a folder of .exportgrids and produces the corresponding LHAPDF grid 
 fixpar_evolve = "fixparpdf.scripts.fixpar_evolve:main"
+# fixpar script to pre-compute the theory covariance matrix
+fixpar_setupfit = "fixparpdf.scripts.fixpar_setupfit:main"
 
 [tool.poetry.dependencies]
 python = ">=3.9"

@@ -57,5 +57,8 @@ def init_global_pars(config):
 
     # Populate the share data
     # TODO: this can take _full_dataset so that it doesn't go into _fit_pars
-    global_pars.shared_populate_data()
+    thid = config["theoryid"]
+    use_thcovmat = "theorycovmatconfig" in config
+
+    global_pars.shared_populate_data(theoryid=thid, use_theory_covmat = use_thcovmat)
  

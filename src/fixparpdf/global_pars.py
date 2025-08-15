@@ -10,9 +10,11 @@ They are all frozen and instantiated as the runcards are read.
 import dataclasses
 from functools import cache, cached_property
 import os
+from pathlib import Path
 
 from nnpdf_data.validphys_compatibility import legacy_to_new_map
 import numpy as np
+import pandas as pd
 from validphys.api import API
 from validphys.convolution import central_predictions
 from validphys.covmats import dataset_inputs_covmat_from_systematics
@@ -44,9 +46,9 @@ class Chi2Pars:
     # if true add diagonal elements of hessian from positivity (if used) - set to false for final output
     add_hessp = False
     # use dynamic tolerance
-    dynamic_tol:bool = False
+    dynamic_tol: bool = False
     # T^2 value for error calculation
-    t2_err:float = 1.0
+    t2_err: float = 1.0
     # pos chi_0
     chi_pos0 = 0.0
     # pos chi_1
@@ -72,36 +74,36 @@ class Chi2Pars:
 @dataclasses.dataclass
 class BasisPars:
     # If true then two term gluon parameterisation used
-    g_second_term:bool = True
+    g_second_term: bool = True
     # if true and g_second_term=False then includes 7th Chebyshev for gluon
-    g_cheb7:bool = False
+    g_cheb7: bool = False
     # If true then delta_S+ set to that of sea
-    asp_fix:bool = True
+    asp_fix: bool = True
     # If true the delta_d=delta_u for d_V and u_V (need to set delta_d fixed or will crash!)
-    dvd_eq_uvd:bool = False
+    dvd_eq_uvd: bool = False
     # if true then fix A_s+ to force xT_8 -> 0 as x -> 0
-    t8_int:bool = False
+    t8_int: bool = False
     # location of different PDF pars in parameter array
-    i_uv_min:int = 0
-    i_uv_max:int = 9
-    i_dv_max:int = 18
-    i_sea_max:int = 27
-    i_sp_max:int = 36
-    i_g_max:int = 46
-    i_sm_max:int = 56
-    i_dbub_max:int = 64
-    i_ch_max:int = 73
-    i_dv_min:int = i_uv_max
-    i_sea_min:int = i_dv_max
-    i_sp_min:int = i_sea_max
-    i_g_min:int = i_sp_max
-    i_sm_min:int = i_g_max
-    i_dbub_min:int = i_sm_max
-    i_ch_min:int = i_dbub_max
+    i_uv_min: int = 0
+    i_uv_max: int = 9
+    i_dv_max: int = 18
+    i_sea_max: int = 27
+    i_sp_max: int = 36
+    i_g_max: int = 46
+    i_sm_max: int = 56
+    i_dbub_max: int = 64
+    i_ch_max: int = 73
+    i_dv_min: int = i_uv_max
+    i_sea_min: int = i_dv_max
+    i_sp_min: int = i_sea_max
+    i_g_min: int = i_sp_max
+    i_sm_min: int = i_g_max
+    i_dbub_min: int = i_sm_max
+    i_ch_min: int = i_dbub_max
     # If true then have (up to) 8 rather than 6 Chebyshevs in input
-    Cheb_8:bool = False
+    Cheb_8: bool = False
     # Number pars
-    n_pars:int = 0
+    n_pars: int = 0
 
     # TODO: should this class be just fixed constants?
     # why can it change?
@@ -126,7 +128,6 @@ class BasisPars:
             self.i_ch_min = self.i_dbub_max
 
 
-
 @dataclasses.dataclass
 class MinPars:
     # if true use sgd
@@ -139,17 +140,17 @@ class MinPars:
 class PDFPars:
     #
     # use external LHAPDF grid as input
-    lhin:bool = False
+    lhin: bool = False
     # if true then scatters when doing direct PDF pd fit
     pdfscat: bool = False
     # labels PDF set for theory evaluation - used internally, value here arbitrary
-    pdflabel:str = None
+    pdflabel: str = None
     # labels central PDF (with no parameter variations in fit for each iteration)
-    PDFlabel_cent:str = 'init'
+    PDFlabel_cent: str = 'init'
     #  if true then do direct fit to PDF pseudodata
-    pdpdf:bool = False
+    pdpdf: bool = False
     # counter to ensure new lhapdf grid used for every new theory evaluation
-    idir:int = 0
+    idir: int = 0
     # When reading directly from LHAPDF (to be removed)
     PDFlabel_lhin: str = None
     # array containing input PDF parameters - set in code
@@ -179,9 +180,8 @@ class PDFPars:
     @cached_property
     def lhapdfdir(self) -> str:
         if os.environ.get("LHAPDF_DATA_PATH") is not None:
-            return  os.environ["LHAPDF_DATA_PATH"]
+            return os.environ["LHAPDF_DATA_PATH"]
         return get_lha_datapath() + "/"
-
 
 
 @dataclasses.dataclass
@@ -253,23 +253,24 @@ class InoutPars:
         covinput: str
             File from where to read the covariance matrix if readcov = True
         readcov: bool
-        
+
     """
+
     # Name of pdf parameter inputnam, value here arbitrary
-    inputnam:str
+    inputnam: str
     # labels ofr output files
     label: str = 'init'
     # name of covariance matrix inputnam, if used, value here arbitrary
-    covinput:str = None
+    covinput: str = None
     # if true then read in covariance matrix and evaluate PDF errors
-    readcov:bool = False
+    readcov: bool = False
 
     # if true then write pseudodata out to file
-    pdout:bool = False
+    pdout: bool = False
     # if true then write pseudodata out to file
-    pdin:bool = False
+    pdin: bool = False
     # if true then append irep to label, apart from in evgrid (for pd fits)
-    pd_output:bool = False
+    pd_output: bool = False
     replica: int = None
 
     def __post_init__(self):
@@ -286,40 +287,45 @@ class InoutPars:
             return self.label
         return f"{self.label}_irep{self.replica:04}"
 
+    @property
+    def theory_covmat_path(self):
+        return Path("outputs") / "thcovmat" / f"{self.label}.csv"
+
 
 @dataclasses.dataclass
 class FitPars:
     """
     Fit Level parameters
     """
+
     # run with fixed input parameters (override input card flags)
     fixpar: bool = False
     # impose NNPDF positivity in fit
-    nnpdf_pos:bool = False
+    nnpdf_pos: bool = False
     # if true then generates a replica from baseline dataset with seed irep
     # WIP Equivalent to genrep
-    pseud:bool = False
+    pseud: bool = False
     # irep number - also used when generating error grids
     irep: int = 0
     # if true impose weight to prefer delta_d > 0.25
-    deld_const:bool = False
+    deld_const: bool = False
     # lhrep - rep number for lhin=True set
-    lhrep:int = 0
+    lhrep: int = 0
 
-    # Dataset 
+    # Dataset
     dataset_40: list[dict] = dataclasses.field(default_factory=list)
     pos_data40: list[dict] = dataclasses.field(default_factory=list)
 
     # min number of datasets
-    imindat:int = 0
+    imindat: int = 0
     # global positivity lambda
-    lampos:bool = 1e3
+    lampos: bool = 1e3
     # If true then group datasets together for dynamic tolerance
-    dynT_group:bool = False
+    dynT_group: bool = False
     # If true then remove datasets with n < 5 from dynamic tolerance
-    dynT_ngt5:bool = False
+    dynT_ngt5: bool = False
     # positivity constraint flag (set in code)
-    pos_const:bool = False # TODO: never set by input
+    pos_const: bool = False  # TODO: never set by input
     # deprecated
     nlo_cuts: bool = False
 
@@ -350,11 +356,16 @@ class DataHolder:
 
     dataset:
         list of NNPDF dataset DataSetSpec objects
+    theoryid:
+        target theory ID
+    theory_covmat:
+        Whether the theory covmat should be considered or not
     """
 
     datasets: tuple
     theoryid: int = 40_000_000
     # NOTE: intersection cuts are being ignored, but should've been added upon construction
+    use_theory_covmat: bool = False  # Whether to use the theory covmat or not
 
     @cached_property
     def _data_dict(self):
@@ -369,6 +380,23 @@ class DataHolder:
     def select_datasets(self, names):
         """Select datasets given a list of names"""
         return [self.select_dataset(n) for n in names]
+
+    @cache
+    def _read_thcovmat(self):
+        """Read the theory covariance matrix (if needed) and save it to memory."""
+
+        thcovmat_path = inout_pars.theory_covmat_path
+        if not thcovmat_path.exists():
+            raise FileNotFoundError(
+                f"Theory covmat not found at {thcovmat_path}. Please make sure to run `fixpar_setupfit` before runing the fit!"
+            )
+
+        filecovmat = pd.read_csv(
+            thcovmat_path, index_col=[0, 1, 2], header=[0, 1, 2], sep="\t|,", engine="python"
+        )
+        # Remove string in column id
+        filecovmat.columns = filecovmat.index
+        return filecovmat
 
     @cache
     def produce_covmat(
@@ -397,7 +425,18 @@ class DataHolder:
         covmat = dataset_inputs_covmat_from_systematics(
             cds, _list_of_central_values=central_values, use_weights_in_covmat=False
         )
-        return covmat
+
+        thcovmat = 0.0
+        if self.use_theory_covmat:
+            df = self._read_thcovmat()
+            dnames = [i.setname for i in cds]
+            rows = df[df.index.get_level_values("dataset").isin(dnames)]
+            thcovmat = rows.loc[:, df.columns.get_level_values("dataset").isin(dnames)].values
+            # TODO:
+            #   1. Check that the order of the data in thcovmat and covmat is truly the same
+            #   2. Error out cleanly if _any_ of the datasets is not found in the thcovmat
+
+        return covmat + thcovmat
 
     @cache
     def produce_replica(self, names=None, datasets=None, irep=0, genrep=False):
@@ -431,7 +470,7 @@ sensible_positivity_cuts = [
 ]
 
 
-def shared_populate_data(theoryid = 40001000):
+def shared_populate_data(theoryid=40001000, use_theory_covmat=False):
 
     config = {"theoryid": theoryid, "use_cuts": "internal"}
 
@@ -441,22 +480,18 @@ def shared_populate_data(theoryid = 40001000):
         datasets.append(ds)
 
     positivity_datasets = API.posdatasets(
-        posdatasets=fit_pars.pos_data40,
-        **config,
-        added_filter_rules=sensible_positivity_cuts
+        posdatasets=fit_pars.pos_data40, **config, added_filter_rules=sensible_positivity_cuts
     )
 
-    shared_global_data["data"] = DataHolder(tuple(datasets), theoryid=theoryid)
-    shared_global_data["posdata"] = DataHolder(tuple(positivity_datasets),theoryid=theoryid)
+    shared_global_data["data"] = DataHolder(
+        tuple(datasets), theoryid=theoryid, use_theory_covmat=use_theory_covmat
+    )
+    shared_global_data["posdata"] = DataHolder(tuple(positivity_datasets), theoryid=theoryid)
 
 
 # Instantiate all global configurations
 # Change this perhaps to a namedtuple or something better
-global_configuration = {
-    "min": MinPars(),
-    "closure": PDFClosure(),
-    "dload": DloadPars(),
-}
+global_configuration = {"min": MinPars(), "closure": PDFClosure(), "dload": DloadPars()}
 basis_pars = None
 pdf_pars = None
 inout_pars = None
