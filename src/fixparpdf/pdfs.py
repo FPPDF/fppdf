@@ -1303,10 +1303,11 @@ def parcheck(pars: np.ndarray) -> bool:
         print("PARCHECK : delgp < -1")
         err = True
 
-    gptest = cheb.I(delgp, etagp)
-    if gptest < 1e-50:
-        print("PARCHECK : delgp,etagp too high - unstable")
-        err = True
+    if not err:
+        gptest = cheb.I(delgp, etagp)
+        if gptest < 1e-50:
+            print("PARCHECK : delgp,etagp too high - unstable")
+            err = True
 
     if delsea < -1:
         print("PARCHECK : delsea < -1")
