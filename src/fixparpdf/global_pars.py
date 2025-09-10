@@ -8,7 +8,7 @@ They are all frozen and instantiated as the runcards are read.
 # TODO 2: change the comments to doscstrings (probably can be automated as well)
 
 import dataclasses
-from functools import cache, cached_property
+from functools import cache, cached_property, lru_cache
 import os
 from pathlib import Path
 
@@ -249,11 +249,8 @@ class InoutPars:
             Input file with the PDF parameters
         label: str
             Label for the output files
-
         covinput: str
-            File from where to read the covariance matrix if readcov = True
-        readcov: bool
-
+            File from where to read the covariance matrix, defaults to <label>.dat
     """
 
     # Name of pdf parameter inputnam, value here arbitrary
@@ -262,8 +259,6 @@ class InoutPars:
     label: str = 'init'
     # name of covariance matrix inputnam, if used, value here arbitrary
     covinput: str = None
-    # if true then read in covariance matrix and evaluate PDF errors
-    readcov: bool = False
 
     # if true then write pseudodata out to file
     pdout: bool = False
@@ -398,7 +393,7 @@ class DataHolder:
         filecovmat.columns = filecovmat.index
         return filecovmat
 
-    @cache
+    @lru_cache
     def produce_covmat(
         self, pdf=None, imin=None, imax=None, names=None, datasets=None, use_t0=True
     ):

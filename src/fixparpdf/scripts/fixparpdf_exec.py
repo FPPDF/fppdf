@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 
-from argparse import ArgumentParser, ArgumentTypeError
-import subprocess as sp
+from argparse import ArgumentParser
 import time
 
 from reportengine.utils import yaml_safe
-from fixparpdf.utils import existing_path, init_global_pars
 
+from fixparpdf.utils import existing_path, init_global_pars
 
 
 def _no_free_parameters(vp_pdf):
@@ -66,24 +65,21 @@ def main():
     )
     args = parser.parse_args()
 
-    # It is possible to call the previous script as well
-    #     fixpar_script = Path(__file__).parent / "fixpar_nnpdf.py"
-    #     sp.run(["python3", fixpar_script.as_posix(), "--config", args.runcard.as_posix()])
-
-    ##################
-
     config = yaml_safe.load(args.runcard.open("r"))
     # init global variables
     init_global_pars(config)
     # import global variables to be used in this module
-    from fixparpdf.global_pars import inout_pars, pdf_pars, chi2_pars, fit_pars, pdf_closure, dload_pars
+    from fixparpdf.global_pars import (
+        chi2_pars,
+        dload_pars,
+        fit_pars,
+        inout_pars,
+        pdf_closure,
+        pdf_pars,
+    )
 
     tzero = time.process_time()
     print(tzero)
-
-    # this can be removed
-    if inout_pars.readcov:
-        return _hessian_error_calculation()
 
     # TODO: the input files right now are read through the global_pars
     # they can be given to the right functions directly here

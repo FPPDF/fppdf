@@ -4,6 +4,7 @@ Common functions to fixparpdf and hessianerr scripts
 
 from argparse import ArgumentTypeError
 from pathlib import Path
+
 from fixparpdf import global_pars
 
 
@@ -13,9 +14,10 @@ def existing_path(value):
         return ArgumentTypeError(f"Could not find {value_path}")
     return value_path
 
+
 def init_global_pars(config):
     """Initialize the global variables staring from the input runcard"""
-    
+
     # Read the necessary inputs from runcard
     _input_config = config.get("inout_parameters", {})
     _basis_config = config.get("basis pars", {})
@@ -44,13 +46,16 @@ def init_global_pars(config):
     # Fill default labels:
     label = _input_config.setdefault("label", "init")
     _input_config.setdefault("covinput", f"{label}.dat")
+    if "readcov" in _input_config:
+        if _input_config.pop("readcov"):
+            print("inout_parameters::readcov is no longer needed")
 
     # Instantiate the global configuration
     global_pars.basis_pars = global_pars.BasisPars(**_basis_config)
-    global_pars.inout_pars =  global_pars.InoutPars(**_input_config)
-    global_pars.pdf_pars =  global_pars.PDFPars(**_pdf_pars)
-    global_pars.chi2_pars =  global_pars.Chi2Pars(**_chi2_pars)
-    global_pars.fit_pars =  global_pars.FitPars(**_fit_pars)
+    global_pars.inout_pars = global_pars.InoutPars(**_input_config)
+    global_pars.pdf_pars = global_pars.PDFPars(**_pdf_pars)
+    global_pars.chi2_pars = global_pars.Chi2Pars(**_chi2_pars)
+    global_pars.fit_pars = global_pars.FitPars(**_fit_pars)
 
     if global_pars.pdf_pars.lhin != global_pars.fit_pars.fixpar:
         raise ValueError("Both pdf_pars::lhin and fit_pars::fixpar must have the same value")
@@ -60,5 +65,4 @@ def init_global_pars(config):
     thid = config["theoryid"]
     use_thcovmat = "theorycovmatconfig" in config
 
-    global_pars.shared_populate_data(theoryid=thid, use_theory_covmat = use_thcovmat)
- 
+    global_pars.shared_populate_data(theoryid=thid, use_theory_covmat=use_thcovmat)

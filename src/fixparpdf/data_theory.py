@@ -52,8 +52,8 @@ def del_pen_calc():
 def compute_theory(datasets, vp_pdf, theta_idx=None) -> np.ndarray:
     """Compute theory predictions for all given datasets for the given PDF.
 
-        If a theta_idx is given, the derivative with respect to the parameter will be taken.
-        The result is a concatenation of all theory predictions
+    If a theta_idx is given, the derivative with respect to the parameter will be taken.
+    The result is a concatenation of all theory predictions
     """
     ret = []
     for dataset in datasets:
@@ -80,4 +80,4 @@ def pos_calc(pdata, vp_pdf, theta_idx=None) -> np.ndarray:
         ret = np.minimum(ret, 0.0)
 
     # Return a positivity contribution to be summed to the loss
-    return -lam * ret       
+    return -lam * ret

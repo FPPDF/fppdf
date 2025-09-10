@@ -57,13 +57,7 @@ class MSHTSet(LHAPDFSet):
     """
 
     def __init__(
-        self,
-        pdf_function,
-        parameters,
-        name,
-        error_type="replicas",
-        variation=None,
-        theta_idx=None,
+        self, pdf_function, parameters, name, error_type="replicas", variation=None, theta_idx=None
     ):
         self._error_type = error_type
         self._name = name
@@ -966,11 +960,7 @@ def msum_ag(pars):
     # outng=0.608941296908194
 
     outg1 = int_g1_msht(
-        ag,
-        xmin,
-        two_terms=basis_pars.g_second_term,
-        cheb8=c8,
-        g_cheb7=basis_pars.g_cheb7,
+        ag, xmin, two_terms=basis_pars.g_second_term, cheb8=c8, g_cheb7=basis_pars.g_cheb7
     )
     outg2 = int_g2_msht(ag, xmin, two_terms=basis_pars.g_second_term)
 
