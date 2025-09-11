@@ -39,9 +39,9 @@ def init_global_pars(config):
         _pdf_pars["pdpdf"] = _pdf_closure_config.get("pdpdf", False)
 
     _full_dataset = config["dataset_inputs"]
-    _pos_dataset = config.get("posdatasets", [])
     _fit_pars["dataset_40"] = _full_dataset
-    _fit_pars["pos_data40"] = _pos_dataset
+    _fit_pars["pos_data40"] = config.get("posdatasets", [])
+    _fit_pars["added_filter_rules"] = config.get("added_filter_rules", [])
 
     # Fill default labels:
     label = _input_config.setdefault("label", "init")

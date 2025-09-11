@@ -37,10 +37,9 @@ fixpar_setupfit = "fixparpdf.scripts.fixpar_setupfit:main"
 
 [tool.poetry.dependencies]
 python = ">=3.9"
-nnpdf = { git = "https://github.com/NNPDF/nnpdf", branch = "speed_up_convolutions"}
-# We are using some improvements from the above branch, but they will be included in
-# NNPDF 4.1.1 so _hopefully_ by the time this code is released we can install from pypi
-#nnpdf = "^4.1.1"
+nnpdf = { git = "https://github.com/NNPDF/nnpdf" }
+# We are using some improvements that will be included in the NNPDF 4.1.1 code release
+# but currently need to be installed from the repository
 
 [tool.black]
 line-length = 100

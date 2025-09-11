@@ -310,6 +310,7 @@ class FitPars:
     # Dataset
     dataset_40: list[dict] = dataclasses.field(default_factory=list)
     pos_data40: list[dict] = dataclasses.field(default_factory=list)
+    added_filter_rules: list[dict] = dataclasses.field(default_factory=list)
 
     # min number of datasets
     imindat: int = 0
@@ -416,6 +417,7 @@ class DataHolder:
                 cached_central_predictions(ds, pdf).to_numpy().reshape(-1) for ds in datasets
             ]
 
+        # TODO: if the datasets are not ordered by experiment in the runcard the might come incorrectly here!!
         cds = [ds.load_commondata() for ds in datasets]
         covmat = dataset_inputs_covmat_from_systematics(
             cds, _list_of_central_values=central_values, use_weights_in_covmat=False
@@ -425,8 +427,7 @@ class DataHolder:
         if self.use_theory_covmat:
             df = self._read_thcovmat()
             dnames = [i.setname for i in cds]
-            rows = df[df.index.get_level_values("dataset").isin(dnames)]
-            thcovmat = rows.loc[:, df.columns.get_level_values("dataset").isin(dnames)].values
+            thcovmat = df.loc[pd.IndexSlice[:, dnames], pd.IndexSlice[:, dnames]].values
             # TODO:
             #   1. Check that the order of the data in thcovmat and covmat is truly the same
             #   2. Error out cleanly if _any_ of the datasets is not found in the thcovmat
@@ -452,22 +453,9 @@ class DataHolder:
 # Limite the shared global data to what's available in this dictionary
 shared_global_data = {"data": None, "posdata": None}
 
-sensible_positivity_cuts = [
-    {"dataset": "NNPDF_POS_2P24GEV_FLL", "rule": "x > 5.0e-7"},
-    {"dataset": "NNPDF_POS_2P24GEV_F2C", "rule": "x < 0.74"},
-    {"dataset": "NNPDF_POS_2P24GEV_XGL", "rule": "x > 0.1"},
-    {"dataset": "NNPDF_POS_2P24GEV_XUQ", "rule": "x > 0.1"},
-    {"dataset": "NNPDF_POS_2P24GEV_XUB", "rule": "x > 0.1"},
-    {"dataset": "NNPDF_POS_2P24GEV_XDQ", "rule": "x > 0.1"},
-    {"dataset": "NNPDF_POS_2P24GEV_XDB", "rule": "x > 0.1"},
-    {"dataset": "NNPDF_POS_2P24GEV_XSQ", "rule": "x > 0.1"},
-    {"dataset": "NNPDF_POS_2P24GEV_XSB", "rule": "x > 0.1"},
-]
-
-
 def shared_populate_data(theoryid=40001000, use_theory_covmat=False):
 
-    config = {"theoryid": theoryid, "use_cuts": "internal"}
+    config = {"theoryid": theoryid, "use_cuts": "internal", "added_filter_rules":fit_pars.added_filter_rules}
 
     datasets = []
     for dinput in fit_pars.dataset_40:
@@ -475,7 +463,7 @@ def shared_populate_data(theoryid=40001000, use_theory_covmat=False):
         datasets.append(ds)
 
     positivity_datasets = API.posdatasets(
-        posdatasets=fit_pars.pos_data40, **config, added_filter_rules=sensible_positivity_cuts
+        posdatasets=fit_pars.pos_data40, **config
     )
 
     shared_global_data["data"] = DataHolder(

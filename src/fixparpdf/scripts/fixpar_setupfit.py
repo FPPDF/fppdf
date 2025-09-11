@@ -34,7 +34,7 @@ class FixparSetupConfig(SetupFitConfig):
         thid = file_content["theoryid"]
         file_content.setdefault("theory", {"theoryid": thid})
 
-        # And remove the checks we are not interested in
+        # Leave only the computation of the theory covmat
         file_content["actions_"] = ["datacuts::theory::theorycovmatconfig nnfit_theory_covmat"]
 
         return cls(file_content, *args, **kwargs)
