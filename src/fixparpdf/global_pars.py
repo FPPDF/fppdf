@@ -449,6 +449,17 @@ class DataHolder:
 
         return make_replica(lcd, irep, covmat, genrep=genrep)
 
+    @cache
+    def get_theory(self):
+        """Get the theory spec."""
+        return API.theoryid(theoryid=self.theoryid)
+
+    @cached_property
+    def q20(self):
+        """Get the fit initial q2."""
+        tspec = self.get_theory()
+        return tspec.get_description()["Q0"]
+
 
 # Limite the shared global data to what's available in this dictionary
 shared_global_data = {"data": None, "posdata": None}

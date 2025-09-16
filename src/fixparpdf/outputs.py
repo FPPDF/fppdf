@@ -271,12 +271,7 @@ def evgrido():
         pset = lhapdf.getPDFSet(pdf_pars.PDFlabel_lhin)
         pdfs = pset.mkPDFs()
 
-    thid = shared_global_data["data"].theoryid
-    # TODO: look at the Q directly from the theory
-    if thid in (211, 212, 40001000, 50001000):
-        qin = 1.00
-    elif thid in (200, 40000000):
-        qin = 1.65
+    qin = shared_global_data["data"].q20
 
     for i, x in enumerate(xgrid.flat):
 
@@ -361,7 +356,7 @@ def evgrido():
 
     data = {
         "replica": 1,
-        "q20": 1.0,
+        "q20": qin**2,
         "xgrid": xgrid.T.tolist()[0],
         "labels": [
             "TBAR",
