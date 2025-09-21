@@ -370,7 +370,7 @@ def bruteforce_ind(x, afi, eig, arg_dchi2max):
 
 
 def get_chi2_ind(af, t, eig):
-
+    """Get the individual chi2s"""
     afint = af.copy() + t * eig
     chi2t_t = chi2min(afint)
     deltachi2 = np.array(chi2_pars.chi_ind_arr) - np.array(chi2_pars.chi0_ind_arr)

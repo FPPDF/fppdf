@@ -28,7 +28,7 @@ class Chi2Pars:
     eps_arr_newmin = []
     # use t0 prescription for covariance matrix in chi^2 calculation
     t0 = False
-    # if true then calculatess individual dataset chi^2 values
+    # if true then calculatess individual dataset chi^2 values, used for dynamic tolerance
     chi2ind = False
     # flag for iterating through datasets when doing individually
     idat = 0.0

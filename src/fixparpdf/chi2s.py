@@ -3,6 +3,7 @@ from pathlib import Path
 
 import numba as nb
 import numpy as np
+import pandas as pd
 import scipy.linalg as la
 import scipy.stats as st
 from validphys.api import API
@@ -204,38 +205,6 @@ def chi2corr_ind_group(imin, imax):
 def chi2corr_lab(i):
     """Return dataset index i from the share data"""
     return shared_global_data["data"].datasets[i]
-
-
-def chi2corr_ind(i):
-    """Compute chi2 for a single dataset"""
-    ds = shared_global_data["data"].datasets[i]
-    #     dlabel = shared_nnfit_pars.dataset_40[i]
-    # TODO: this can be simplified
-
-    if chi2_pars.t0:
-        # inpt0 = dict(dataset_inputs=dscomb, theoryid=fit_pars.theoryidi, use_cuts="internal", t0pdfset=pdf_pars.PDFlabel, use_t0=True)
-        # cov = API.dataset_inputs_t0_covmat_from_systematics(**inpt0)
-        cov_gl = dload_pars.covt0
-    else:
-        # inp = dict(dataset_inputs=dscomb, theoryid=fit_pars.theoryidi, use_cuts="internal")
-        # cov = API.dataset_inputs_covmat_from_systematics(**inp)
-        cov_gl = dload_pars.covexp
-
-    cov_ind = cov_gl[
-        chi2_pars.idat_low_arr[i] : chi2_pars.idat_up_arr[i],
-        chi2_pars.idat_low_arr[i] : chi2_pars.idat_up_arr[i],
-    ]
-    cov = cov_ind
-    cov_inv = la.inv(cov)
-
-    theory = dload_pars.tharr_gl[chi2_pars.idat_low_arr[i] : chi2_pars.idat_up_arr[i]]
-    dattot = dload_pars.darr_gl[chi2_pars.idat_low_arr[i] : chi2_pars.idat_up_arr[i]]
-    ndat = len(dattot)
-
-    diffs = np.array(dattot - theory)
-    out = diffs @ cov_inv @ diffs
-
-    return (out, ndat, ds)
 
 
 def chi2corr_global(datasets, vp_pdf=None, theta_idx=None):
@@ -538,119 +507,44 @@ def chi2totcalc(vp_pdf=None):
     ndtot = 0
     chi2totind = 0.0
     if chi2_pars.chi2ind:
-        # outputfile=open('outputs/chi2ind/'+inout_pars.label+'.dat','w')
-        # outputfile.write("inputnam = ")
-        # outputfile.write(inout_pars.inputnam)
-        # outputfile.write("\n")
         chi2_pars.chi_ind_arr = []
         chi2_pars.idat = 0.0
 
-        for i in range(fit_pars.imindat, fit_pars.imaxdat):
+        # Get the full covmat and make it into a dataframe indexed by label
+        # The compute the chi2 for each dataset
+        if chi2_pars.t0:
+            pdf = vp_pdf
+        else:
+            pdf = None
 
-            (chi, nd, dlab) = chi2corr_ind(i)
-            # print(dlab,chi)
+        covmat = shared_global_data["data"].produce_covmat(datasets=datasets, pdf=pdf, use_t0=chi2_pars.t0)
+        labels = [i.name for i in datasets for _ in range(i.load_commondata().ndata)]
+        dfcov = pd.DataFrame(covmat, columns=labels, index=labels)
 
-            if fit_pars.dynT_group:
-                chi2ind_calc = True
+        idat = 0
+        for dataset in datasets:
+            # NB: using double squares here to preserve the matrix-structure even in ndata=1 datasets
+            partial_cov = dfcov.loc[[dataset.name], [dataset.name]]
+            ndat = dataset.load_commondata().ndata
 
-                # if str(dlab)=='BCDMSP_dwsh':
-                #     chi2corr_ind_plot(i,i)
+            fdat = idat + ndat
+            # Compute the chi2 of the individual dataset:
+            theory = dload_pars.tharr_gl[idat:fdat]
+            # This should be equal to the commondata central value unless we are loading closure data
+            dattot = dload_pars.darr_gl[idat:fdat]
 
-                if str(dlab) in [
-                    'CMSTTBARTOT7TEV',
-                    'ATLAS_TTB_DIFF_8TEV_LJ_TRAPNORM',
-                    'ATLASTTBARTOT7TEV',
-                    'ATLASZPT8TEVMDIST',
-                    'HERACOMBNCEM',
-                    'HERACOMB_SIGMARED_C',
-                    'ATLASWZRAP11CC',
-                    'ATLAS_WP_JET_8TEV_PT',
-                ]:
+            diffs = np.array(dattot - theory)
+            cov_inv = la.inv(partial_cov)
 
-                    if str(dlab) == 'HERACOMBNCEM':
-                        dlab.name = 'HERA inclusive'
-                        (chi, nd) = chi2corr_ind_group(i, i + 6)
-                    elif str(dlab) == 'HERACOMB_SIGMARED_C':
-                        dlab.name = 'HERA Heavy Flavour'
-                        # (chii,ndi)=chi2corr_ind_group(i,i)
-                        # chi2corr_ind_plot(i,i)
-                        (chi, nd) = chi2corr_ind_group(i, i + 1)
-                    elif str(dlab) == 'ATLASWZRAP11CC':
-                        dlab.name = 'ATLASWZRAP11 (CC+CF)'
-                        (chi, nd) = chi2corr_ind_group(i, i + 1)
-                    elif str(dlab) == 'ATLAS_WP_JET_8TEV_PT':
-                        dlab.name = 'ATLAS_WPM_JET_8TEV_PT'
-                        (chi, nd) = chi2corr_ind_group(i, i + 1)
-                    elif str(dlab) == 'ATLASZPT8TEVMDIST':
-                        dlab.name = 'ATLASZPT8TEV'
-                        (chi, nd) = chi2corr_ind_group(i, i + 1)
-                    elif str(dlab) == 'ATLASTTBARTOT7TEV':
-                        dlab.name = 'ATLASTTBARTOT'
-                        (chi, nd) = chi2corr_ind_group(i, i + 2)
-                    elif str(dlab) == 'ATLAS_TTB_DIFF_8TEV_LJ_TRAPNORM':
-                        dlab.name = 'ATLAS_TTB_DIFF_8TEV_LJ'
-                        (chi, nd) = chi2corr_ind_group(i, i + 1)
-                    elif str(dlab) == 'CMSTTBARTOT7TEV':
-                        dlab.name = 'CMSTTBARTOT'
-                        (chi, nd) = chi2corr_ind_group(i, i + 2)
+            chi2 = diffs @ cov_inv @ diffs
 
-                    chi2ind_calc = False
-                    if fit_pars.dynT_ngt5:
-                        if nd > 4:
-                            chi2_pars.chi_ind_arr.append(chi)
-                            chi2totind += chi
-                            ndtot += nd
-                            if chi2_pars.calc_cl:
-                                chilim_fill(nd, chi, dlab)
-                    else:
-                        chi2_pars.chi_ind_arr.append(chi)
-                        chi2totind += chi
-                        ndtot += nd
-                        if chi2_pars.calc_cl:
-                            chilim_fill(nd, chi, dlab)
+            chi2_pars.chi_ind_arr.append(chi2)
+            chi2totind += chi2
+            ndtot += ndat
 
-                if str(dlab) in [
-                    'CMSTTBARTOT13TEV',
-                    'CMSTTBARTOT8TEV',
-                    'ATLAS_TTB_DIFF_8TEV_LJ_TTRAPNORM',
-                    'ATLAS_TTBARTOT_13TEV_FULLLUMI',
-                    'ATLASTTBARTOT8TEV',
-                    'ATLASZPT8TEVYDIST',
-                    'ATLAS_WM_JET_8TEV_PT',
-                    'ATLASWZRAP11CF',
-                    'HERACOMB_SIGMARED_B',
-                    'HERACOMBNCEP460',
-                    'HERACOMBNCEP575',
-                    'HERACOMBNCEP820',
-                    'HERACOMBNCEP920',
-                    'HERACOMBCCEM',
-                    'HERACOMBCCEP',
-                ]:
-                    chi2ind_calc = False
+            if chi2_pars.calc_cl:
+                chilim_fill(ndat, chi2, dataset)
 
-                if chi2ind_calc:
-
-                    if fit_pars.dynT_ngt5:
-                        if nd > 4:
-                            chi2_pars.chi_ind_arr.append(chi)
-                            chi2totind += chi
-                            ndtot += nd
-                            if chi2_pars.calc_cl:
-                                chilim_fill(nd, chi, dlab)
-                    else:
-                        (chi, nd, dlab) = chi2corr_ind(i)
-                        chi2_pars.chi_ind_arr.append(chi)
-                        chi2totind += chi
-                        ndtot += nd
-                        if chi2_pars.calc_cl:
-                            chilim_fill(nd, chi, dlab)
-            else:
-                (chi, nd, dlab) = chi2corr_ind(i)
-                chi2_pars.chi_ind_arr.append(chi)
-                chi2totind += chi
-                ndtot += nd
-                if chi2_pars.calc_cl:
-                    chilim_fill(nd, chi, dlab)
 
     out0 = np.sum(chiarr)
 
@@ -663,18 +557,13 @@ def chi2totcalc(vp_pdf=None):
 
     if chi2_pars.calc_cl:
         chi2_pars.chi_pos0 = out1
-        # chilim_sort()
     chi2_pars.calc_cl = False
-    # if chi2_pars.chi2ind:
-    #     chi2_pars.chi_ind_arr=chi2_pars.chi_ind_arr+out1-chi2_pars.chi_pos0
 
-    if fit_pars.deld_const:
-        # dv
-        out0 = out0 + del_pen(pdf_pars.deld_arr[0])[0]
-        # uv
-        out0 = out0 + del_pen(pdf_pars.delu_arr[0])[0]
-
-    # print('out0,out1 (chitot)=',out0,out1)
+#     if fit_pars.deld_const:
+#         # dv
+#         out0 = out0 + del_pen(pdf_pars.deld_arr[0])[0]
+#         # uv
+#         out0 = out0 + del_pen(pdf_pars.delu_arr[0])[0]
 
     return (out0, out1)
 
@@ -698,10 +587,7 @@ def hess_ij_calc_d2(diffi, diffj, cov, covin):
 
 def hess_ij_calc_not0_new(theoryi, theoryj, outi, outj, cov, covin):
 
-    dattot = dload_pars.darr_gl
-
     diffij = theoryi - theoryj
-    # outij=calc_chi2(la.cholesky(cov, lower=True), diffij)
     outij = diffij @ covin @ diffij
     outa = outi / 2.0 + outj / 2.0 - outij
 
