@@ -301,9 +301,13 @@ def hesserror_dynamic_tol_new(afi, hess, jaci):
                         )
                     except RuntimeError as err:
                         print('newton method failing, try brute force...')
-                        dchi2 = 10.0
-                        while dchi2 > 1.0:
-                            tchi -= 0.05
+                        
+                        dchi2 = 0.
+                        delt=i*0.1
+                        tchi=delt
+                        
+                        while dchi2 < 1.0:
+                            tchi += delt
                             print('tchi = ', tchi)
                             (deltachi2_lim, dchi2, arg_dchi2max, chi2t) = get_chi2_ind(
                                 af, tchi, eig0.copy()
