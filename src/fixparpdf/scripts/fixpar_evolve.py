@@ -8,7 +8,8 @@ from evolven3fit.evolve import evolve_fit
 from reportengine.utils import yaml_safe
 from validphys.loader import FallbackLoader
 
-from fixparpdf.utils import existing_path
+from fixparpdf.utils import existing_path, init_global_pars
+from fixparpdf.outputs import EVGRIDS_F
 
 
 def create_lhapdf(fit_folder, path_lhapdf):
@@ -34,10 +35,16 @@ def main():
     parser.add_argument("--lhapdf-path", type=Path)
     args = parser.parse_args()
 
-    # TODO: ensure that all the runcards go through global params
+    # TODO: ensure that all the runcards go through global params in utils
     config = yaml_safe.load(args.fit_runcard.open("r"))
+    init_global_pars(config)
 
-    fit_folder = Path("outputs") / "evgrids" / config["inout_parameters"]["label"]
+    from fixparpdf.global_pars import inout_pars, chi2_pars
+
+    if chi2_pars.dynamic_tol:
+        fit_folder = EVGRIDS_F / f"{inout_pars.label}_dyntol"
+    else:
+        fit_folder = EVGRIDS_F / inout_pars.label
 
     if not fit_folder.exists():
         raise FileNotFoundError(f"Fit folder {fit_folder} not found")

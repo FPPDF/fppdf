@@ -12,10 +12,11 @@ OUTPUT_F = Path("outputs")
 BUFFER_F = OUTPUT_F / "buffer"
 PARS_F = OUTPUT_F / "pars"
 EVGRIDS_F = OUTPUT_F / "evgrids"
+GRIDS_F = OUTPUT_F / "evgrids"
 PLOTS_F = OUTPUT_F / "plots"
 RES_F = OUTPUT_F / "res"
 COV_F = OUTPUT_F / "cov"
-for PF in [BUFFER_F, PARS_F, EVGRIDS_F, PLOTS_F, RES_F, COV_F]:
+for PF in [BUFFER_F, PARS_F, EVGRIDS_F, PLOTS_F, RES_F, COV_F, GRIDS_F]:
     PF.mkdir(exist_ok=True, parents=True)
 
 
@@ -62,7 +63,21 @@ def covmatout(hessi, jaci):
             outputfile.write("\n")
 
 
-def evgrido():
+def evgrido(pdf_name=None):
+    """Create the exportgrid files for evolution
+    If a pdf_name is not given, use the label of the fit.
+    Note that the output for each member is written down to a separated "replica" folder
+    in order to use the evolution routines from NNPDF without changes.
+    """
+    if pdf_name is None:
+        if inout_pars.pd_output:
+            pdf_name = inout_pars.pd_output_lab
+        else:
+            pdf_name = inout_pars.label
+
+    dirgrid = EVGRIDS_F / pdf_name / "nnfit" / f"replica_{str(fit_pars.irep+1)}"
+    dirgrid.mkdir(exist_ok=True, parents=True)
+    output = dirgrid / f"{pdf_name}.exportgrid"
 
     xgrid = np.array(
         [
@@ -339,23 +354,8 @@ def evgrido():
         test[195, 12] = 0.0
         test[195, 13] = 0.0
 
-    if inout_pars.pd_output:
-        dirgrid0 = EVGRIDS_F / inout_pars.pd_output_lab
-    else:
-        dirgrid0 = EVGRIDS_F / inout_pars.label
-
-    dirgrid1 = dirgrid0 / "nnfit"
-    dirgrid = dirgrid1 / f"replica_{str(fit_pars.irep+1)}"
-
-    dirgrid.mkdir(exist_ok=True, parents=True)
-
-    if inout_pars.pd_output:
-        output = dirgrid / f"{inout_pars.pd_output_lab}.exportgrid"
-    else:
-        output = dirgrid / f"{inout_pars.label}.exportgrid"
-
     data = {
-        "replica": 1,
+        "replica": 1,  # fake
         "q20": qin**2,
         "xgrid": xgrid.T.tolist()[0],
         "labels": [
@@ -422,9 +422,15 @@ def resout(pospeni, pospenf, chi2t0i, chi2expi, chi2t0f, chi2expf, n):
     outputfile.write("\n")
 
 
-def parsout():
+def parsout(output_filename=None):
+    """Write down the parameters of the PDF fit.
+    If an output filename is not given, it will default to the label.
+    """
+    if output_filename is None:
+        output_filename = inout_pars.label
 
-    outputfile = open('outputs/pars/' + inout_pars.label + '.dat', 'w')
+    outputfile = (PARS_F / output_filename).with_suffix(".dat").open("w")
+
     pars = pdf_pars.pdfparsi.copy()
     # auv=pars[0:9]
     auv = pars[basis_pars.i_uv_min : basis_pars.i_uv_max].copy()
@@ -575,11 +581,12 @@ def plotout():
             outputfile.write('\n')
 
 
-def gridout():
+def gridout(pdf_name=None):
+    """Write down the grid in the grids output folder for the given pdf_name
+    If a pdf_name is not given, use the label of the fit."""
+    if pdf_name is None:
+        pdf_name = inout_pars.label
 
-    outdir = 'outputs/grids/'
-    name = inout_pars.label
-
-    initlha(name, outdir)
-    pdf_pars.PDFlabel = name
-    writelha_end(name, outdir, pdf_pars.pdfparsi)
+    initlha(pdf_name, GRIDS_F)
+    pdf_pars.PDFlabel = pdf_name
+    writelha_end(pdf_name, GRIDS_F, pdf_pars.pdfparsi)
