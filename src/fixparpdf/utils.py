@@ -57,8 +57,8 @@ def init_global_pars(config):
     global_pars.chi2_pars = global_pars.Chi2Pars(**_chi2_pars)
     global_pars.fit_pars = global_pars.FitPars(**_fit_pars)
 
-    if global_pars.pdf_pars.lhin != global_pars.fit_pars.fixpar:
-        raise ValueError("Both pdf_pars::lhin and fit_pars::fixpar must have the same value")
+    # if global_pars.pdf_pars.lhin != global_pars.fit_pars.fixpar:
+    #     raise ValueError("Both pdf_pars::lhin and fit_pars::fixpar must have the same value")
 
     # Populate the share data
     # TODO: this can take _full_dataset so that it doesn't go into _fit_pars
