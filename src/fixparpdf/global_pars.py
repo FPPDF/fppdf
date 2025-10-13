@@ -460,6 +460,11 @@ class DataHolder:
         tspec = self.get_theory()
         return tspec.get_description()["Q0"]
 
+    @cached_property
+    def is_intrinsic_charm(self):
+        """Check whether the theory has charm active at the fitting scale."""
+        tspec = self.get_theory()
+        return tspec.get_description()["IC"] == 1
 
 # Limite the shared global data to what's available in this dictionary
 shared_global_data = {"data": None, "posdata": None}

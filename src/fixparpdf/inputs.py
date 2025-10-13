@@ -18,7 +18,6 @@ def readincov():
 
     inputfile = 'outputs/cov/' + inout_pars.covinput
 
-    # disttot=np.loadtxt(inputfile,skiprows=2,max_rows=64)
     disttot = np.loadtxt(inputfile, skiprows=2, max_rows=73)
 
     # pdf_pars.parsin=disttot[0:64,0].flatten()
@@ -150,8 +149,7 @@ def readin():
     #   Set charm to zero if p. charm theory!
     nchm = basis_pars.i_ch_max - basis_pars.i_ch_min
     # TODO: ask the theory for intrinsic charm
-    thid = shared_global_data["data"].theoryid
-    if thid in (200, 40000000):
+    if shared_global_data["data"].is_intrinsic_charm:
         distcharm = np.loadtxt(
             inputfile, skiprows=8 + nuv + ndv + nsea + nsp + ng + nsm + ndbub, max_rows=nchm
         )
@@ -236,8 +234,7 @@ def readin_Cheb8():
         distcharm = np.loadtxt(inputfile, skiprows=68, max_rows=9)
 
     #   Set charm to zero if p. charm theory!
-    thid = shared_global_data["data"].theoryid
-    if thid in (211, 212, 40001000, 50001000):
+    if not shared_global_data["data"].is_intrinsic_charm:
         distcharm = np.zeros((9, 2))
 
     # disttot=np.vstack([distuv,distdv,distsea,distsp,distg,distsm,distdbub])
