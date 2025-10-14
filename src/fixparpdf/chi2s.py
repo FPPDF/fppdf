@@ -547,6 +547,7 @@ def chi2totcalc(vp_pdf=None):
 
 
     out0 = np.sum(chiarr)
+    out0 = np.abs(out0)
 
     out1 = 0.0
     if fit_pars.pos_const:
