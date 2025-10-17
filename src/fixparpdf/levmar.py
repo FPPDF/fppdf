@@ -7,6 +7,7 @@ from scipy import linalg as la
 from fixparpdf.chi2s import chi2min_fun, hess_zeros
 from fixparpdf.global_pars import chi2_pars, dload_pars, fit_pars, inout_pars, min_pars, pdf_pars
 from fixparpdf.outputs import covmatout, parsout
+import tracemalloc
 
 
 class _BufferLog:
@@ -275,7 +276,6 @@ def levmar_meth3(afree):
 
     return afout
 
-
 def levmar(afree):
     """
     Levenberg–Marquardt algorithm, takes the set of free parameters
@@ -342,6 +342,8 @@ LM meth 1
     # if and only if we finished due to tolerance
     fit_pars.pos_const = False
 
+    #tracemalloc.start()
+    snapshots = []
     while nt < ntries:
         nt += 1
 
@@ -354,6 +356,9 @@ LM meth 1
             lam = lam_initial
 
         _bufferlog.write(f'ntries = {nt}')
+        #snapshots.append(tracemalloc.take_snapshot())
+        #if nt > 5:
+        #    import ipdb; ipdb.set_trace()
 
         if nstepmax:
             _bufferlog.write('max steps reached: exit')
@@ -435,7 +440,6 @@ LM meth 1
             elif not levmsht:
 
                 if lev_update:
-
                     if lev_minpack:
                         for i in range(0, len(hess)):
                             hessmax0 = hess[i, i]
@@ -470,7 +474,7 @@ LM meth 1
                 # rhoden = lam*delpar@np.diag(hess.diagonal())@delpar+delpar@jac
                 rhoden = lam * np.sum(delpar**2 @ hess.diagonal()) + delpar @ jac
 
-            elif levmsht:
+            else:
                 hesst = hessi.copy() / 2
                 hesstt = hessi.copy() / 2.0
                 for i in range(0, pdf_pars.npar_free):

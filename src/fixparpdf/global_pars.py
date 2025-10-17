@@ -336,10 +336,10 @@ def _sanitize(name):
     return newname
 
 
-@cache
+@lru_cache
 def cached_central_predictions(ds, pdf):
     # TODO: this caching can (and should) be lifted to validphys
-    return central_predictions(ds, pdf)
+    return central_predictions.__wrapped__(ds, pdf)
 
 
 # TODO: this is a temporary function to remove states and caches from the functions above
@@ -394,7 +394,6 @@ class DataHolder:
         filecovmat.columns = filecovmat.index
         return filecovmat
 
-    @lru_cache
     def produce_covmat(
         self, pdf=None, imin=None, imax=None, names=None, datasets=None, use_t0=True
     ):

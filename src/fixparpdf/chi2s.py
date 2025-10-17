@@ -792,12 +792,11 @@ def jaccalc_newmin(hess_calc: bool, vp_pdf: MSHTPDF):
     print(f"Free parameters: {pdf_pars.npar_free}")
 
     # Allocate the array for the jacobian
-    jacarr = np.zeros((pdf_pars.npar_free))
+    jacarr = np.zeros(pdf_pars.npar_free)
 
     # Allocate the arrays to compute the hessian
     tarr = []
     hessarr = np.zeros((pdf_pars.npar_free, pdf_pars.npar_free))
-    jacarr = np.zeros((pdf_pars.npar_free))
 
     # Prepare positivity output
     if fit_pars.pos_const:
