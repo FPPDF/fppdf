@@ -19,6 +19,48 @@ COV_F = OUTPUT_F / "cov"
 for PF in [BUFFER_F, PARS_F, EVGRIDS_F, PLOTS_F, RES_F, COV_F, GRIDS_F]:
     PF.mkdir(exist_ok=True, parents=True)
 
+def covmatout_err(hessi, jaci):
+
+    #    hessin=hessi.copy()
+    #    hessin=la.inv(hessin)
+    pars = pdf_pars.pdfparsi.copy()
+    output = COV_F / f"{inout_pars.label}_scanout.dat"
+
+    print('call covmatout')
+    print(output)
+
+    with open(output, 'w') as outputfile:
+
+        outputfile.write('npar=')
+        outputfile.write('\n')
+        outputfile.write(str(pdf_pars.npar_free))
+        outputfile.write('\n')
+
+        for i in range(0, 73):
+            outputfile.write(str(pars[i]))
+            outputfile.write(" ")
+            outputfile.write(str(pdf_pars.par_isf[i]))
+            outputfile.write(" ")
+            outputfile.write("\n")
+
+        outputfile.write('\n')
+
+        for i in range(0, pdf_pars.npar_free):
+            np.savetxt(outputfile, hessi[i, :], fmt="%.7E", delimiter=' ', newline=' ')
+            outputfile.write('\n')
+
+        #        outputfile.write('\n')
+
+        #        for i in range(0,pdf_pars.npar_free):
+        #            np.savetxt(outputfile,hessin[i,:],fmt="%.7E",delimiter=' ', newline=' ')
+        #            outputfile.write('\n')
+
+        outputfile.write('\n')
+
+        for i in range(0, pdf_pars.npar_free):
+            outputfile.write(str(jaci[i]))
+            outputfile.write("\n")
+
 
 def covmatout(hessi, jaci):
 
@@ -421,6 +463,111 @@ def resout(pospeni, pospenf, chi2t0i, chi2expi, chi2t0f, chi2expf, n):
     outputfile.write(str(pospenf))
     outputfile.write("\n")
 
+def parsout_err(output_filename=None):
+    """Write down the parameters of the PDF fit.
+    If an output filename is not given, it will default to the label.
+    """
+    if output_filename is None:
+        output_filename = inout_pars.label
+
+    output_filename = output_filename + '_scanout'
+
+    outputfile = (PARS_F / output_filename).with_suffix(".dat").open("w")
+    
+
+    pars = pdf_pars.pdfparsi.copy()
+    # auv=pars[0:9]
+    auv = pars[basis_pars.i_uv_min : basis_pars.i_uv_max].copy()
+    auv = np.delete(auv, 0)
+    # adv=pars[9:18]
+    adv = pars[basis_pars.i_dv_min : basis_pars.i_dv_max].copy()
+    adv = np.delete(adv, 0)
+    # asea=pars[18:27]
+    asea = pars[basis_pars.i_sea_min : basis_pars.i_sea_max].copy()
+    # asp=pars[27:36]
+    asp = pars[basis_pars.i_sp_min : basis_pars.i_sp_max].copy()
+    # ag=pars[36:46]
+    ag = pars[basis_pars.i_g_min : basis_pars.i_g_max].copy()
+    ag = np.delete(ag, 0)
+    # asm=pars[46:56]
+    asm = pars[basis_pars.i_sm_min : basis_pars.i_sm_max].copy()
+    asm = np.delete(asm, 3)
+    # adbub=pars[56:64]
+    adbub = pars[basis_pars.i_dbub_min : basis_pars.i_dbub_max].copy()
+    # charm=pars[64:73]
+    charm = pars[basis_pars.i_ch_min : basis_pars.i_ch_max].copy()
+
+    outputfile.write("uv parameters (delu,etau,cu1-6)")
+    outputfile.write("\n")
+    for i in range(0, len(auv)):
+        outputfile.write(str(auv[i]))
+        outputfile.write(" ")
+        outputfile.write(str(0))
+        outputfile.write(" ")
+        outputfile.write("\n")
+
+    outputfile.write("dv parameters (deld,etad,cd1-6)")
+    outputfile.write("\n")
+    for i in range(0, len(adv)):
+        outputfile.write(str(adv[i]))
+        outputfile.write(" ")
+        outputfile.write(str(0))
+        outputfile.write(" ")
+        outputfile.write("\n")
+
+    outputfile.write("sea parameters (AS,delS,etaS,cS1-6)")
+    outputfile.write("\n")
+    for i in range(0, len(asea)):
+        outputfile.write(str(asea[i]))
+        outputfile.write(" ")
+        outputfile.write(str(0))
+        outputfile.write(" ")
+        outputfile.write("\n")
+
+    outputfile.write("s+ parameters (Asp,delsp,etasp,csp1-6)")
+    outputfile.write("\n")
+    for i in range(0, len(asp)):
+        outputfile.write(str(asp[i]))
+        outputfile.write(" ")
+        outputfile.write(str(0))
+        outputfile.write(" ")
+        outputfile.write("\n")
+
+    outputfile.write("Gluon parameters (etagp,delgp,cg1-4,etagm,delgm)")
+    outputfile.write("\n")
+    for i in range(0, len(ag)):
+        outputfile.write(str(ag[i]))
+        outputfile.write(" ")
+        outputfile.write(str(0))
+        outputfile.write(" ")
+        outputfile.write("\n")
+
+    outputfile.write("s- parameters (Asm,delsm,etasm, cs1-4)")
+    outputfile.write("\n")
+    for i in range(0, len(asm)):
+        outputfile.write(str(asm[i]))
+        outputfile.write(" ")
+        outputfile.write(str(0))
+        outputfile.write(" ")
+        outputfile.write("\n")
+
+    outputfile.write("db/ub parameters (Arho,etarho,crho1-6)")
+    outputfile.write("\n")
+    for i in range(0, len(adbub)):
+        outputfile.write(str(adbub[i]))
+        outputfile.write(" ")
+        outputfile.write(str(0))
+        outputfile.write(" ")
+        outputfile.write("\n")
+
+    outputfile.write("charm parameters (Ac,etac,cc1-6)")
+    outputfile.write("\n")
+    for i in range(0, len(charm)):
+        outputfile.write(str(charm[i]))
+        outputfile.write(" ")
+        outputfile.write(str(0))
+        outputfile.write(" ")
+        outputfile.write("\n")
 
 def parsout(output_filename=None):
     """Write down the parameters of the PDF fit.
