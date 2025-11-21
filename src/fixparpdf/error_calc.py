@@ -35,6 +35,9 @@ def hesserror_dynamic_tol_new(afi, hess, jaci):
     chi2_pars.chitotind = False
     chi2_pars.L0 = False
 
+    #   Remove the lat lam_sub eigenevectors from scan 
+    lam_sub=30
+
     # hessinv=la.inv(hess)
     # lamt,eigt = la.eigh(hessinv)
 
@@ -76,7 +79,7 @@ def hesserror_dynamic_tol_new(afi, hess, jaci):
     output_log.write_text(f"chi2_0 = {chi0:.5f}, neig = {len(lam)}")
 
     #   Loop over eigenvectors
-    for j in range(0, len(lam)):
+    for j in range(0, len(lam)-lam_sub):
         print('j = ', j)
 
         # jth eigenvector
@@ -428,7 +431,7 @@ def hesserror_new_call(afi, hessin,irun):
     af_out=afi.copy()
 
 #   Remove the lat lam_sub eigenevectors from scan 
-    lam_sub=0
+    lam_sub=30
 
     end_run=False
 
