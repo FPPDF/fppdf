@@ -24,7 +24,8 @@ def create_lhapdf(fit_folder, path_lhapdf):
 
     info_data = yaml_safe.load((fit_folder / "nnfit" / f"{fit_folder.name}.info").open("r"))
     info_data["NumMembers"] = members
-    yaml_safe.dump(info_data, (path_lhapdf / f"{fit_folder.name}.info").open("w"))
+    with (path_lhapdf / f"{fit_folder.name}.info").open("w") as info_out:
+        yaml_safe.dump(info_data, info_out)
     print(f"Congratulations, you will find you PDF at: {path_lhapdf.absolute().as_posix()}")
 
 

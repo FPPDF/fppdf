@@ -37,9 +37,7 @@ fixpar_setupfit = "fixparpdf.scripts.fixpar_setupfit:main"
 
 [tool.poetry.dependencies]
 python = ">=3.9"
-nnpdf = { git = "https://github.com/NNPDF/nnpdf" }
-# We are using some improvements that will be included in the NNPDF 4.1.1 code release
-# but currently need to be installed from the repository
+nnpdf = ">=4.1.2"
 
 [tool.black]
 line-length = 100

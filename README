@@ -8,7 +8,9 @@ Requires NNPDF code from https://docs.nnpdf.science either from source or conda
 
 To run simply execute:
 
-python fixpar_nnpdf.py --config=configs/**.yaml
+```
+python fixpar_nnpdf.py <runcard>.yaml
+```
 
 for the corresponding .yaml file. Some explanation of the various flags is provided in the example .yaml files but clearly this needs better documentation + some specific example cases to be provided. Adding to this, to run:
 
@@ -23,3 +25,33 @@ The outputs are in the outputs/ folder:
 /cov : covariance matrix (used for error calculation)
 /evscans: outputs if eigenvector scan is done
 /pars : the PDF parameters
+
+# Step-by-step fit
+
+0. (only in the case of missing higher order uncertainties in the covariance matrix)
+
+Run the following command to prepare the run and compute the theory covariance matrix.
+```
+fixpar_setupfit <runcard.yml>
+```
+
+1. Perform the minimization.
+
+This procedure might take some hours.
+```
+fixpar_fitpdf <runcard.yml>
+```
+
+2. Compute the hessian error members.
+
+Once the fit has finished, used the fit parameters found in the previous step to compute the hessian error members using the chosen prescription.
+```
+fixpar_hessianerr <runcard.yml>
+```
+
+3. Evolve and create the final grid.
+
+Once the PDF set at the initial scale has been computed, evolve it to generate a full LHAPDF grid for all scales.
+```
+fixpar_evolve <runcard.yml>
+```
