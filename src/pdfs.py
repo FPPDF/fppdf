@@ -1,18 +1,21 @@
 import functools
-from global_pars import *
-from chebyshevs import *
 from copy import deepcopy
+
+import numba as nb
 import numpy as np
+
+import chebyshevs as cheb
+from global_pars import *
+
 try:
     from scipy.integrate import quadrature
-    from scipy.misc import derivative as deriv
 except ImportError:
     from scipy.integrate import quad as quadrature
-    from scipy.differentiate import derivative as deriv
 
-from validphys.core import PDF
+from validphys.convolution import central_predictions
+from validphys.core import PDF, DataSetSpec
 from validphys.lhapdfset import LHAPDFSet
-from validphys.api import API
+
 
 def _derivative(func, fl, parameters, x, eps):
     """The scipy.misc.derivative function is deprecated and won't exist in newer versions
@@ -26,16 +29,31 @@ def _derivative(func, fl, parameters, x, eps):
     funvals = np.array([func(fl, p, x) for p in parameters])
     return np.sum(funvals * weights) / np.sum(eps)
 
-def _derivative_th_prediction(func, use_cuts, theoryid, dataset_input, parameters, eps):
-    """As _derivative but specialized for the th_predictions function"""
+
+def _derivative_th_prediction(func, dataset, parameters, eps):
+    """As _derivative but specialized for the th_predictions function.
+    Takes as input the function to be called (``func``) which must have as signature (dataset, parameters) -> result
+    Where dataset is a validphys Dataset object
+    """
     weights = np.array([1, -8, 8, -1]) / 12.0
-    funvals = np.array([func(use_cuts, theoryid, dataset_input, p) for p in parameters])
-    return np.sum(funvals * weights[:,np.newaxis],axis=0) / np.sum(eps)
+    funvals = np.array([func(dataset, p) for p in parameters])
+    return np.sum(funvals * weights[:, np.newaxis], axis=0) / np.sum(eps)
+
+
+class _Hashrray:
+    def __init__(self, xgrid):
+        self.xgrid = xgrid
+
+    def __hash__(self):
+        return hash(self.xgrid.tobytes())
 
 
 class MSHTSet(LHAPDFSet):
     """Provides a few lhapdf-like functions to trick vp into thinking it is an LHAPDFset
-    Can work with any function with a signature of (flavour, parameters, x)
+
+    Can work with any function with a signature of:
+
+        pdf_function(flavour:int, parameters: np.ndarray, xgrid: np.ndarray) -> np.ndarray
     """
 
     def __init__(
@@ -52,37 +70,44 @@ class MSHTSet(LHAPDFSet):
         self._flavors = None
         self._lhapdf_set = [None]
 
-        self._parameters = parameters
-        self._pdf_function = pdf_function
         self._derivatives = []
         self._variation = variation
+        self._parameters = parameters
+
+        # Given a PDF function, set the parameters up
+        self._pdf_function = pdf_function
 
         if variation is not None:
             # Compute the 4 variations needed for the derivative
             for k in [-2, -1, 1, 2]:
                 self._derivatives.append(
-                    parinc_newmin(
-                        self._parameters, theta_idx, k * variation, true_idx=True
-                    )[0]
+                    parinc_newmin(self._parameters, theta_idx, k * variation, true_idx=True)[0]
                 )
+
+    def __hash__(self):
+        """Uniqueness for this class is defined by the set of parameters,
+        which define the name, and whether the derivatives are active"""
+        return hash((self._name, self._derivatives is None))
 
     @functools.cached_property
     def is_derivative(self):
         """Whether this is a PDF of its derivative"""
         return self._variation is not None
 
-    def xfxQ(self, x, Q, n, fl):
+    @cache
+    def _xfxQ(self, x: _Hashrray, Q: float, n: int, fl: int):
         """Return the PDF value for one single point for one single member
         Note that in this case both scale (Q) and member (n) are ignored.
         """
         if fl == 21:
             fl = 0
+        x = x.xgrid
         if self.is_derivative:
-            return _derivative(
-                self._pdf_function, fl, self._derivatives, x, self._variation
-            )
-        else:
-            return self._pdf_function(fl, self._parameters, x)
+            return _derivative(self._pdf_function, fl, self._derivatives, x, self._variation)
+        return self._pdf_function(fl, self._parameters, x)
+
+    def xfxQ(self, x: np.ndarray, Q: float, n: int, fl: int):
+        return self._xfxQ(_Hashrray(x), Q, n, fl)
 
     def grid_values(self, flavors: np.ndarray, xgrid: np.ndarray, qgrid: np.ndarray):
         """Returns the PDF values for every member for the required flavors, x, q
@@ -92,9 +117,7 @@ class MSHTSet(LHAPDFSet):
         """
         out_ret = []
         for fl in flavors:
-            tmp = []
-            for x in xgrid:
-                tmp.append(self.xfxQ(x, None, None, fl))
+            tmp = self.xfxQ(xgrid, None, None, fl)
             out_ret.append(tmp)
         return np.array(out_ret).reshape(1, len(flavors), -1, 1)
 
@@ -139,7 +162,7 @@ class MSHTPDF(PDF):
             self._pdf_parameters,
             self.name,
             variation=self._variation,
-            theta_idx=self._theta_idx
+            theta_idx=self._theta_idx,
         )
 
     def make_derivative(self, idx, eps=1e-5):
@@ -161,356 +184,362 @@ class MSHTPDF(PDF):
         t0_version._error_type = "t0"
         return t0_version
 
-    def th_predictions(self, use_cuts, theoryid, dataset_input, parameters):
+    def th_predictions(self, ds, parameters):
         """Compute theory predictions given the PDF"""
-        pdf = self.__class__(
-            pdf_function=self._pdf_function,
-            pdf_parameters=parameters
-        )
-        return API.central_predictions(use_cuts=use_cuts, theoryid=theoryid, pdf=pdf, dataset_input=dataset_input).values[:,0]
+        pdf = self.__class__(pdf_function=self._pdf_function, pdf_parameters=parameters)
+        return central_predictions(ds, pdf).values[:, 0]
 
-    def derivative_th_predictions(self, use_cuts, theoryid, dataset_input, theta_idx):
+    def derivative_th_predictions(self, ds, theta_idx):
         """Compute the derivative of the theory predictions wrt the free parameter theta_idx"""
         derivatives = []
         variation = np.maximum(1e-12, 1e-5 * np.abs(self._pdf_parameters[theta_idx]))
         # Compute the 4 variations needed for the derivative
         for k in [-2, -1, 1, 2]:
             derivatives.append(
-                parinc_newmin(
-                    self._pdf_parameters, theta_idx, k * variation, true_idx=True
-                )[0]
+                parinc_newmin(self._pdf_parameters, theta_idx, k * variation, true_idx=True)[0]
             )
-        return _derivative_th_prediction(self.th_predictions, use_cuts, theoryid, dataset_input, derivatives, variation)
+        return _derivative_th_prediction(self.th_predictions, ds, derivatives, variation)
 
-def func_pdfs_diff(eps,ipdf=1,x=0.0,iorder=5):
+    def central_predictions(
+        self, dataset: DataSetSpec, derivative_theta_idx: int = None
+    ) -> np.ndarray:
+        """Compute the central predictions for the given dataset (a DataSetSpec object).
+        If a derivative_theta_idx is given, the derivative with respect to the given parameter will be taken.
+        """
+        if derivative_theta_idx is None:
+            return central_predictions(dataset, self).values[:, 0]
+        return self.derivative_th_predictions(dataset, derivative_theta_idx)
 
-    # print(eps)
 
-    if eps == 0.:
-        out=pdfs_msht(ipdf,pdf_pars.parinarr[0,:],x)
-        if pdf_pars.parin_newmin_reset:
-            pdf_pars.parinarr_newmin[pdf_pars.parin_newmin_counter,:]=pdf_pars.parinarr[0,:]
-    else:
-        if pdf_pars.parin_newmin_reset:
-            (pars,eps_out)=parinc_newmin(pdf_pars.parinarr[0,:],chi2_pars.ipdf_newmin-1,eps)
-            pdf_pars.parinarr_newmin[pdf_pars.parin_newmin_counter,:]=pars
-        else:
-            pars=pdf_pars.parinarr_newmin[pdf_pars.parin_newmin_counter,:]
-        out=pdfs_msht(ipdf,pars,x)
+###########################################################################################################################
+## This program can fit _any_ function with the following signature:
+## (flavour: int, parameters: np.ndarray, xgrid: np.ndarray) -> pdf_{flavour}(parameters)(xgrid): np.ndarray
+###################################################################################################################
 
-    pdf_pars.parin_newmin_counter+=1
 
-    return out
-
-def pdfs_diff(ipdf, x=None, parin=None):
-    eps=1e-5
-    # (pars,eps_out)=parinc_newmin(pdf_pars.parinarr[0,:],chi2_pars.ipdf_newmin-1,eps)
-
-    eps=parinc_eps(pdf_pars.parinarr[0,:],chi2_pars.ipdf_newmin-1,eps)
-
-    pdf_pars.parin_newmin_counter=0
-    iorder=5
-    pdfout=deriv(func_pdfs_diff,0.,eps,args=(ipdf,x,iorder),order=iorder)
-
-#     test = functools.partial(func_pdfs_diff, x=x, ipdf=ipdf)
-#     ret = _derivative(test, eps, ipdf, pdf_pars.parinarr[0,:], x)
-
-    mypdf = pdf_pars.derivatives
-    if pdfout > 1e-5 and chi2_pars.ipdf_newmin >0:
-        pass
-
-    pdf_pars.parin_newmin_reset=False
-
-    return pdfout
-
-def pdfs_msht(ipdf,pars,x):
+def pdfs_msht(ipdf: int, pars: np.ndarray, x: np.ndarray):
     """
-        Compute a MSHT PDF given a set of parameters ``pars'' for x=x
+    Compute a MSHT PDF given a set of parameters ``pars'' for x=x
     """
-    etaq=pars[57]
+    if pars is None or x is None:
+        raise ValueError("Cannot compute pdf")
 
+    etaq = pars[57]
+
+    # Compute the tricky dbub contribution which might lead to problems
+    # depending on the value of the etaq parameter
     if etaq < 0.0:
-        etaqt=np.power(1.-x,-etaq)
+        etaqt = np.power(1.0 - x, -etaq)
+        valid_indices = etaqt > 1e-20
+        tricky_cont = np.zeros_like(x)
+        if valid_indices.any():
+            tricky_cont[valid_indices] = pdfs_msht_basis(7, pars, x[valid_indices])
+            # Then we use the valid indices to set the contributions we don't like
     else:
-        etaqt=1.
+        tricky_cont = pdfs_msht_basis(7, pars, x)
+        valid_indices = True
 
-        
+    if ipdf == -3:
+        sm = pdfs_msht_basis(6, pars, x)
+        sp = pdfs_msht_basis(4, pars, x)
+        out = (sp - sm) / 2.0
+    elif ipdf == -2:
+        sp = pdfs_msht_basis(4, pars, x)
+        sea = pdfs_msht_basis(3, pars, x)
+        dbpub = (sea - sp) / 2.0
 
-    if ipdf==-3:
-        sm=pdfs_msht_basis(6,pars,x)
-        sp=pdfs_msht_basis(4,pars,x)
-        out=(sp-sm)/2.
-    elif ipdf==-2:
-        sp=pdfs_msht_basis(4,pars,x)
-        sea=pdfs_msht_basis(3,pars,x)
-        dbpub=(sea-sp)/2.
-        if etaqt < 1e-20:
-            out=0.0
-        else:
-            dbdub=pdfs_msht_basis(7,pars,x)        
-            out=dbpub/(1+dbdub)
-    elif ipdf==-1:
-        sp=pdfs_msht_basis(4,pars,x)
-        sea=pdfs_msht_basis(3,pars,x)
-        dbpub=(sea-sp)/2.
-        if etaqt < 1e-20:
-            out=dbpub
-        else:
-            dbdub=pdfs_msht_basis(7,pars,x)
-            out=dbpub/(1+dbdub)*dbdub
-    elif ipdf==0:
-        out=pdfs_msht_basis(5,pars,x)
-    elif ipdf==1:
-        sp=pdfs_msht_basis(4,pars,x)
-        sea=pdfs_msht_basis(3,pars,x)
-        dbpub=(sea-sp)/2.
-        dv=pdfs_msht_basis(2,pars,x)
-        if etaqt < 1e-20:
-            db=dbpub
-        else:
-            dbdub=pdfs_msht_basis(7,pars,x)
-            db=dbpub/(1+dbdub)*dbdub
-        out=dv+db
-    elif ipdf==2:
-        sp=pdfs_msht_basis(4,pars,x)
-        sea=pdfs_msht_basis(3,pars,x)
-        uv=pdfs_msht_basis(1,pars,x)
-        dbpub=(sea-sp)/2.
-        if etaqt < 1e-20:
-            ub=0.
-        else:
-            dbdub=pdfs_msht_basis(7,pars,x)
-            ub=dbpub/(1+dbdub)
-        out=uv+ub
-    elif ipdf==3:
-        sm=pdfs_msht_basis(6,pars,x)
-        sp=pdfs_msht_basis(4,pars,x)
-        out=(sp+sm)/2.
-    elif ipdf==-4:
-        out=pdfs_msht_basis(8,pars,x)/2.
-    elif ipdf==4:
-        out=pdfs_msht_basis(8,pars,x)/2.
+        dbdub = tricky_cont
+        out = dbpub / (1 + dbdub) * valid_indices
+
+    elif ipdf == -1:
+        sp = pdfs_msht_basis(4, pars, x)
+        sea = pdfs_msht_basis(3, pars, x)
+        dbpub = (sea - sp) / 2.0
+
+        dbdub = tricky_cont
+        out = dbpub * np.where(valid_indices, dbdub / (1 + dbdub), 1.0)
+
+    elif ipdf == 0:
+        out = pdfs_msht_basis(5, pars, x)
+    elif ipdf == 1:
+        sp = pdfs_msht_basis(4, pars, x)
+        sea = pdfs_msht_basis(3, pars, x)
+        dbpub = (sea - sp) / 2.0
+
+        dv = pdfs_msht_basis(2, pars, x)
+        dbdub = tricky_cont
+
+        db = dbpub * np.where(valid_indices, dbdub / (1 + dbdub), 1.0)
+        out = dv + db
+
+    elif ipdf == 2:
+        sp = pdfs_msht_basis(4, pars, x)
+        sea = pdfs_msht_basis(3, pars, x)
+        uv = pdfs_msht_basis(1, pars, x)
+        dbpub = (sea - sp) / 2.0
+
+        dbdub = tricky_cont
+        ub = valid_indices * dbpub / (1 + dbdub)
+
+        out = uv + ub
+
+    elif ipdf == 3:
+        sm = pdfs_msht_basis(6, pars, x)
+        sp = pdfs_msht_basis(4, pars, x)
+        out = (sp + sm) / 2.0
+    elif ipdf == -4:
+        out = pdfs_msht_basis(8, pars, x) / 2.0
+    elif ipdf == 4:
+        out = pdfs_msht_basis(8, pars, x) / 2.0
     else:
-        out=0.
-        
+        out = np.zeros_like(x)
+
     return out
-        
-def pdfs_msht_basis(ipdf,pars,x):
 
-    if ipdf==1:
-        # auv=pars[0:9].copy()
-        auv=pars[basis_pars.i_uv_min:basis_pars.i_uv_max].copy()
-        out=q_msht(x,auv)
-    if ipdf==2:
+
+def pdfs_msht_basis(ipdf, pars, x):
+    """Compute the PDF ``ipdf`` in the MSHT basis at point ``x``
+    given the set of parameters ``pars``.
+    """
+    # Read up the global parameters before calling the compiled functions
+    cheb8 = basis_pars.Cheb_8
+    g_cheb7 = basis_pars.g_cheb7
+    two_terms = basis_pars.g_second_term
+
+    if ipdf == 1:
+        # adv=pars[0:9]
+        auv = pars[basis_pars.i_uv_min : basis_pars.i_uv_max]
+        out = q_msht(x, auv, cheb8=cheb8)
+    elif ipdf == 2:
         # adv=pars[9:18]
-        adv=pars[basis_pars.i_dv_min:basis_pars.i_dv_max].copy()
-        out=q_msht(x,adv)
-    if ipdf==3:
+        adv = pars[basis_pars.i_dv_min : basis_pars.i_dv_max]
+        out = q_msht(x, adv, cheb8=cheb8)
+    elif ipdf == 3:
         # asea=pars[18:27]
-        asea=pars[basis_pars.i_sea_min:basis_pars.i_sea_max].copy()
-        out=q_msht(x,asea)
-    if ipdf==4:
+        asea = pars[basis_pars.i_sea_min : basis_pars.i_sea_max]
+        out = q_msht(x, asea, cheb8=cheb8)
+    elif ipdf == 4:
         # asp=pars[27:36]
-        asp=pars[basis_pars.i_sp_min:basis_pars.i_sp_max].copy()
-        out=q_msht(x,asp)
-    if ipdf==5:
+        asp = pars[basis_pars.i_sp_min : basis_pars.i_sp_max]
+        out = q_msht(x, asp, cheb8=cheb8)
+    elif ipdf == 5:
         # ag=pars[36:46]
-        ag=pars[basis_pars.i_g_min:basis_pars.i_g_max].copy()
-        out=g_msht(x,ag)
-    if ipdf==6:
+        ag = pars[basis_pars.i_g_min : basis_pars.i_g_max]
+        out = g_msht(x, ag, two_terms=two_terms, cheb8=cheb8, g_cheb7=g_cheb7)
+    elif ipdf == 6:
         # asm=pars[46:56]
-        asm=pars[basis_pars.i_sm_min:basis_pars.i_sm_max].copy()
-        out=sm_msht(x,asm)
-    if ipdf==7:
+        asm = pars[basis_pars.i_sm_min : basis_pars.i_sm_max]
+        out = sm_msht(x, asm)
+    elif ipdf == 7:
         # adbub=pars[56:64]
-        adbub=pars[basis_pars.i_dbub_min:basis_pars.i_dbub_max].copy()
-        out=dbub_msht(x,adbub)
-    if ipdf==8:
+        adbub = pars[basis_pars.i_dbub_min : basis_pars.i_dbub_max]
+        out = dbub_msht(x, adbub, cheb8=cheb8)
+    elif ipdf == 8:
         # fitcharm=pars[64:73]
-        fitcharm=pars[basis_pars.i_ch_min:basis_pars.i_ch_max].copy()
-        out=q_msht(x,fitcharm)
+        fitcharm = pars[basis_pars.i_ch_min : basis_pars.i_ch_max]
+        out = q_msht(x, fitcharm, cheb8=cheb8)
 
     return out
 
-def sm_msht(x,ain):
-    asm=ain[0]
-    delsm=ain[1]
-    etasm=ain[2]
-    x0=ain[3]
 
-    aqc1=ain[4]
-    aqc2=ain[5]
-    aqc3=ain[6]
-    aqc4=ain[7]
-    aqc5=ain[8]
-    aqc6=ain[9]
-    
-    out=asm*np.power(1-x,etasm)*np.power(x,delsm)*(1-x/x0)
-    out=out*(1.+aqc1*cheb_msht(1,x)+aqc2*cheb_msht(2,x)+aqc3*cheb_msht(3,x)+aqc4*cheb_msht(4,x)+aqc5*cheb_msht(5,x)+aqc6*cheb_msht(6,x))
+@nb.njit
+def sm_msht(x, ain):
+    asm = ain[0]
+    delsm = ain[1]
+    etasm = ain[2]
+    x0 = ain[3]
+
+    aqc1 = ain[4]
+    aqc2 = ain[5]
+    aqc3 = ain[6]
+    aqc4 = ain[7]
+    aqc5 = ain[8]
+    aqc6 = ain[9]
+
+    out = asm * np.power(1 - x, etasm) * np.power(x, delsm) * (1 - x / x0)
+    out = out * (
+        1.0
+        + aqc1 * cheb_msht(1, x)
+        + aqc2 * cheb_msht(2, x)
+        + aqc3 * cheb_msht(3, x)
+        + aqc4 * cheb_msht(4, x)
+        + aqc5 * cheb_msht(5, x)
+        + aqc6 * cheb_msht(6, x)
+    )
 
     return out
 
-def sp_norm_fix(asea,ain):
 
-    aq=ain[0]
-    delq=ain[1]
-    etaq=ain[2]
-    aqc1=ain[3]
-    aqc2=ain[4]
-    aqc3=ain[5]
-    aqc4=ain[6]
-    aqc5=ain[7]
-    aqc6=ain[8] 
+def sp_norm_fix(asea, ain):
 
-    norm_cheb=(1.+aqc1+aqc2+aqc3+aqc4+aqc5+aqc6)
+    aq = ain[0]
+    delq = ain[1]
+    etaq = ain[2]
+    aqc1 = ain[3]
+    aqc2 = ain[4]
+    aqc3 = ain[5]
+    aqc4 = ain[6]
+    aqc5 = ain[7]
+    aqc6 = ain[8]
+
+    norm_cheb = 1.0 + aqc1 + aqc2 + aqc3 + aqc4 + aqc5 + aqc6
 
     if basis_pars.Cheb_8:
-        aqc7=ain[9]
-        aqc8=ain[10]
-        norm_cheb+=aqc7+aqc8
-    
-    out=asea/norm_cheb/3.
+        aqc7 = ain[9]
+        aqc8 = ain[10]
+        norm_cheb += aqc7 + aqc8
+
+    out = asea / norm_cheb / 3.0
 
     return out
-
 
 
 def Phi_msht_int():
 
-    xmin=1e-6
-    xmax=0.5
+    xmin = 1e-6
+    xmax = 0.5
 
+    if (
+        fit_pars.theoryidi == 211
+        or fit_pars.theoryidi == 40001000
+        or fit_pars.theoryidi == 50001000
+    ):
+        pdfmax = 8
+    else:
+        pdfmax = 9
 
-    if fit_pars.theoryidi==211 or fit_pars.theoryidi==40001000 or fit_pars.theoryidi==50001000:
-        pdfmax=8    
-    else: 
-        pdfmax=9
+    if (
+        fit_pars.theoryidi == 211
+        or fit_pars.theoryidi == 40001000
+        or fit_pars.theoryidi == 50001000
+    ):
+        pdfmax = 3
+    else:
+        pdfmax = 4
 
-    if fit_pars.theoryidi==211 or fit_pars.theoryidi==40001000 or fit_pars.theoryidi==50001000:
-        pdfmax=3    
-    else: 
-        pdfmax=4
-
-    out=[]
+    out = []
 
     # for pdfi in range (1,pdfmax):
     #     print(pdfi)
     #     outi=quadrature(arclength_msht,xmin,xmax,args=(pdfi,),rtol=1.0e-04,maxiter=5000)[0]
     #     out=np.append(outi,out)
 
-    for pdfi in range (-pdfmax,pdfmax+1):
+    for pdfi in range(-pdfmax, pdfmax + 1):
         print(pdfi)
-        outi=quadrature(arclength_msht,xmin,xmax,args=(pdfi,),rtol=1.0e-04,maxiter=5000)[0]
-        out=np.append(outi,out)
+        outi = quadrature(arclength_msht, xmin, xmax, args=(pdfi,), rtol=1.0e-04, maxiter=5000)[0]
+        out = np.append(outi, out)
 
-    out=np.flip(out)
+    out = np.flip(out)
 
     return out
 
-def Phi_msht_diff(x,pdfi):
 
-    b=10.
-    c=-0.5
+def Phi_msht_diff(x, pdfi):
 
-    eps=x*1e-3
+    b = 10.0
+    c = -0.5
 
-    xp=x+eps
-    xm=x-eps
-    x2p=x+2.*eps
-    x2m=x-2.*eps
+    eps = x * 1e-3
 
-    phi_plus=Phi_msht(xp,pdfi)
-    phi_minus=Phi_msht(xm,pdfi)
-    phi_0=Phi_msht(x,pdfi)
+    xp = x + eps
+    xm = x - eps
+    x2p = x + 2.0 * eps
+    x2m = x - 2.0 * eps
+
+    phi_plus = Phi_msht(xp, pdfi)
+    phi_minus = Phi_msht(xm, pdfi)
+    phi_0 = Phi_msht(x, pdfi)
 
     # xarr=np.array([x2m,xm,x,xp,x2p])
     # pdfarr=[]
     # for i in range (0,len(xarr)):
     #     pdfarr=np.append(Phi_msht(xarr[i],pdfi),pdfarr)
 
-
     # out=diff2_5point(pdfarr,xarr,eps)
     # out=np.power(out,2)
 
     # print(out)
 
-    out=(phi_plus+phi_minus-2.*phi_0)/np.power(eps,2)
-    out=np.power(out,2)
+    out = (phi_plus + phi_minus - 2.0 * phi_0) / np.power(eps, 2)
+    out = np.power(out, 2)
 
     # print('test')
     # print(x,out)
 
     return out
 
+
 def pdf_test(x):
-    a=1.
-    b=10.
-    c=-0.5
+    a = 1.0
+    b = 10.0
+    c = -0.5
 
-    out=a*np.power(x,c)*np.power(1.-x,b)
-
-    return out
-
-def diff_2point(f,x,eps):
-
-    out=f[1]-f[0]
-    out=out/2./eps
+    out = a * np.power(x, c) * np.power(1.0 - x, b)
 
     return out
 
-def diff2_5point(f,x,eps):
 
-    out=-f[0]+16.*f[1]-30.*f[2]+16.*f[3]-f[4]
-    out=out/12./np.power(eps,2)
+def diff_2point(f, x, eps):
 
-    return out
-
-def diff_5point(f,x,eps):
-
-    out=f[0]-8.*f[1]+8.*f[2]-f[3]
-    out=out/12./eps
+    out = f[1] - f[0]
+    out = out / 2.0 / eps
 
     return out
 
-def arclength_msht(x,pdfi):
 
-    eps=x*1e-3
-    xp=x+eps
-    xm=x-eps
+def diff2_5point(f, x, eps):
+
+    out = -f[0] + 16.0 * f[1] - 30.0 * f[2] + 16.0 * f[3] - f[4]
+    out = out / 12.0 / np.power(eps, 2)
+
+    return out
+
+
+def diff_5point(f, x, eps):
+
+    out = f[0] - 8.0 * f[1] + 8.0 * f[2] - f[3]
+    out = out / 12.0 / eps
+
+    return out
+
+
+def arclength_msht(x, pdfi):
+
+    eps = x * 1e-3
+    xp = x + eps
+    xm = x - eps
 
     # pdf0=pdfs_msht_basis(pdfi,pdf_pars.pdfparsi,x)
     # pdfm=pdfs_msht_basis(pdfi,pdf_pars.pdfparsi,xm)
     # pdfp=pdfs_msht_basis(pdfi,pdf_pars.pdfparsi,xp)
 
-    pdf0=pdfs_msht(pdfi,pdf_pars.pdfparsi,x)
-    pdfm=pdfs_msht(pdfi,pdf_pars.pdfparsi,xm)
-    pdfp=pdfs_msht(pdfi,pdf_pars.pdfparsi,xp)
+    pdf0 = pdfs_msht(pdfi, pdf_pars.pdfparsi, x)
+    pdfm = pdfs_msht(pdfi, pdf_pars.pdfparsi, xm)
+    pdfp = pdfs_msht(pdfi, pdf_pars.pdfparsi, xp)
 
-    out=(pdfp-pdfm)/2./eps
-    out=np.power(out,2)
-    out=np.sqrt(1.+out)
+    out = (pdfp - pdfm) / 2.0 / eps
+    out = np.power(out, 2)
+    out = np.sqrt(1.0 + out)
 
     return out
 
 
-def Phi_msht(x,pdfi):
+def Phi_msht(x, pdfi):
 
-    eps=x*1e-3
-    xp=x+eps
-    xm=x-eps
-    x2p=x+2.*eps
-    x2m=x-2.*eps
+    eps = x * 1e-3
+    xp = x + eps
+    xm = x - eps
+    x2p = x + 2.0 * eps
+    x2m = x - 2.0 * eps
 
-    pdf0=pdfs_msht_basis(pdfi,pdf_pars.pdfparsi,x)
-    pdfm=pdfs_msht_basis(pdfi,pdf_pars.pdfparsi,xm)
-    pdfp=pdfs_msht_basis(pdfi,pdf_pars.pdfparsi,xp)
-
- 
+    pdf0 = pdfs_msht_basis(pdfi, pdf_pars.pdfparsi, x)
+    pdfm = pdfs_msht_basis(pdfi, pdf_pars.pdfparsi, xm)
+    pdfp = pdfs_msht_basis(pdfi, pdf_pars.pdfparsi, xp)
 
     # pdfm=pdf_test(xm)
     # pdfp=pdf_test(xp)
 
-    xarr=np.array([x2m,xm,xp,x2p])
+    xarr = np.array([x2m, xm, xp, x2p])
     # pdfarr=np.log(pdf_test(xarr))
     # pdfarr=[]
     # for i in range (0,len(xarr)):
@@ -519,326 +548,424 @@ def Phi_msht(x,pdfi):
 
     # out=diff_5point(pdfarr,xarr,eps)
 
-    out=(pdfp-pdfm)/2./eps/pdf0
+    out = (pdfp - pdfm) / 2.0 / eps / pdf0
 
-    out=out*x*(1.-x)
+    out = out * x * (1.0 - x)
 
     return out
+
 
 def t8_msht(x):
 
-    sbar=pdfs_msht(-3,pdf_pars.pdfparsi,x)
-    s=pdfs_msht(3,pdf_pars.pdfparsi,x)
-    ubar=pdfs_msht(-2,pdf_pars.pdfparsi,x)
-    u=pdfs_msht(2,pdf_pars.pdfparsi,x)
-    dbar=pdfs_msht(-1,pdf_pars.pdfparsi,x)
-    d=pdfs_msht(1,pdf_pars.pdfparsi,x)
+    sbar = pdfs_msht(-3, pdf_pars.pdfparsi, x)
+    s = pdfs_msht(3, pdf_pars.pdfparsi, x)
+    ubar = pdfs_msht(-2, pdf_pars.pdfparsi, x)
+    u = pdfs_msht(2, pdf_pars.pdfparsi, x)
+    dbar = pdfs_msht(-1, pdf_pars.pdfparsi, x)
+    d = pdfs_msht(1, pdf_pars.pdfparsi, x)
 
-    out=u+ubar+d+dbar-2.*(s+sbar)
+    out = u + ubar + d + dbar - 2.0 * (s + sbar)
 
     return out
+
 
 def q_msht_lowx_norm(ain):
 
-    aq=ain[0]
-    delq=ain[1]
-    etaq=ain[2]
-    aqc1=ain[3]
-    aqc2=ain[4]
-    aqc3=ain[5]
-    aqc4=ain[6]
-    aqc5=ain[7]
-    aqc6=ain[8]  
+    aq = ain[0]
+    delq = ain[1]
+    etaq = ain[2]
+    aqc1 = ain[3]
+    aqc2 = ain[4]
+    aqc3 = ain[5]
+    aqc4 = ain[6]
+    aqc5 = ain[7]
+    aqc6 = ain[8]
 
-    out=aq*(1.+aqc1+aqc2+aqc3+aqc4+aqc5+aqc6)
+    out = aq * (1.0 + aqc1 + aqc2 + aqc3 + aqc4 + aqc5 + aqc6)
 
     return out
-    
-def q_msht(x,ain):
-    aq=ain[0]
-    delq=ain[1]
-    etaq=ain[2]
-    aqc1=ain[3]
-    aqc2=ain[4]
-    aqc3=ain[5]
-    aqc4=ain[6]
-    aqc5=ain[7]
-    aqc6=ain[8]
+
+
+@nb.njit
+def q_msht(x, ain, cheb8: bool = False):
+    """Compute a quark using the MSHT basis given the set of parameters ``ain``.
+    If cheb_8 is True, uses 8 cheb. polynomials instead of 6
+    """
+    aq = ain[0]
+    delq = ain[1]
+    etaq = ain[2]
+    aqc1 = ain[3]
+    aqc2 = ain[4]
+    aqc3 = ain[5]
+    aqc4 = ain[6]
+    aqc5 = ain[7]
+    aqc6 = ain[8]
 
     if aq < 1e-20:
-        out=aq
-    else:   
-        # print(aq,etaq,delq)
-        out=aq*np.power(1.-x,etaq)*np.power(x,delq)*(1.+aqc1*cheb_msht(1,x)+aqc2*cheb_msht(2,x)+aqc3*cheb_msht(3,x)+aqc4*cheb_msht(4,x)+aqc5*cheb_msht(5,x)+aqc6*cheb_msht(6,x))
+        return aq * np.ones_like(x)
+
+    out = (
+        aq
+        * np.power(1.0 - x, etaq)
+        * np.power(x, delq)
+        * (
+            1.0
+            + aqc1 * cheb_msht(1, x)
+            + aqc2 * cheb_msht(2, x)
+            + aqc3 * cheb_msht(3, x)
+            + aqc4 * cheb_msht(4, x)
+            + aqc5 * cheb_msht(5, x)
+            + aqc6 * cheb_msht(6, x)
+        )
+    )
+
+    if cheb8:
+        aqc7 = ain[9]
+        aqc8 = ain[10]
+        out += (
+            aq
+            * np.power(1.0 - x, etaq)
+            * np.power(x, delq)
+            * (aqc7 * cheb_msht(7, x) + aqc8 * cheb_msht(8, x))
+        )
+
+    return out
+
+
+def lg1_msht(x, ain):
+    agp = ain[0]
+    etagp = ain[1]
+    delgp = ain[2]
+    agc1 = ain[3]
+    agc2 = ain[4]
+    agc3 = ain[5]
+    agc4 = ain[6]
+    agm = ain[7]
+    etagm = ain[8]
+    delgm = ain[9]
+
+    x = np.exp(x)
+
+    out = (
+        agp
+        * np.power(1.0 - x, etagp)
+        * np.power(x, delgp)
+        * (
+            1.0
+            + agc1 * cheb_msht(1, x)
+            + agc2 * cheb_msht(2, x)
+            + agc3 * cheb_msht(3, x)
+            + agc4 * cheb_msht(4, x)
+        )
+    )
 
     if basis_pars.Cheb_8:
-        aqc7=ain[9]
-        aqc8=ain[10]
-        out+=aq*np.power(1.-x,etaq)*np.power(x,delq)*(aqc7*cheb_msht(7,x)+aqc8*cheb_msht(8,x))
+        agc5 = ain[10]
+        agc6 = ain[11]
+        out += (
+            agp
+            * np.power(1.0 - x, etagp)
+            * np.power(x, delgp)
+            * (agc5 * cheb_msht(5, x) + agc6 * cheb_msht(6, x))
+        )
+
+    out = out * x
 
     return out
 
-def lg1_msht(x,ain):
-    agp=ain[0]
-    etagp=ain[1]
-    delgp=ain[2]
-    agc1=ain[3]
-    agc2=ain[4]
-    agc3=ain[5]
-    agc4=ain[6]
-    agm=ain[7]
-    etagm=ain[8]
-    delgm=ain[9]
-    
-    x=np.exp(x)
 
-    out=agp*np.power(1.-x,etagp)*np.power(x,delgp)*(1.+agc1*cheb_msht(1,x)+agc2*cheb_msht(2,x)+agc3*cheb_msht(3,x)+agc4*cheb_msht(4,x))
+def lg2_msht(x, ain):
+    agp = ain[0]
+    etagp = ain[1]
+    delgp = ain[2]
+    agc1 = ain[3]
+    agc2 = ain[4]
+    agc3 = ain[5]
+    agc4 = ain[6]
+    agm = ain[7]
+    etagm = ain[8]
+    delgm = ain[9]
 
-    if basis_pars.Cheb_8:
-        agc5=ain[10]
-        agc6=ain[11]
-        out+=agp*np.power(1.-x,etagp)*np.power(x,delgp)*(agc5*cheb_msht(5,x)+agc6*cheb_msht(6,x))
+    x = np.exp(x)
 
-    out=out*x
-    
+    out = agm * np.power(1.0 - x, etagm) * np.power(x, delgm)
+    out = out * x
+
     return out
 
-def lg2_msht(x,ain):
-    agp=ain[0]
-    etagp=ain[1]
-    delgp=ain[2]
-    agc1=ain[3]
-    agc2=ain[4]
-    agc3=ain[5]
-    agc4=ain[6]
-    agm=ain[7]
-    etagm=ain[8]
-    delgm=ain[9]
 
-    x=np.exp(x)
+@nb.njit
+def g_msht(x, ain, two_terms=False, g_cheb7=False, cheb8=False):
+    """Compute the MSHT gluon at point x given the set of
+    10 parameters ``ain``
+    """
+    agp = ain[0]
+    etagp = ain[1]
+    delgp = ain[2]
+    agc1 = ain[3]
+    agc2 = ain[4]
+    agc3 = ain[5]
+    agc4 = ain[6]
+    agm = ain[7]
+    etagm = ain[8]
+    delgm = ain[9]
 
-    out=agm*np.power(1.-x,etagm)*np.power(x,delgm)
-    out=out*x
-    
-    return out
-
-def g_msht(x,ain):
-    agp=ain[0]
-    etagp=ain[1]
-    delgp=ain[2]
-    agc1=ain[3]
-    agc2=ain[4]
-    agc3=ain[5]
-    agc4=ain[6]
-    agm=ain[7]
-    etagm=ain[8]
-    delgm=ain[9]
-
-
-    if(basis_pars.g_second_term):
-        out=agp*np.power(1.-x,etagp)*np.power(x,delgp)*(1.+agc1*cheb_msht(1,x)+agc2*cheb_msht(2,x)+agc3*cheb_msht(3,x)+agc4*cheb_msht(4,x))
-        out+=agm*np.power(1.-x,etagm)*np.power(x,delgm)
-        if basis_pars.Cheb_8:
-            agc5=ain[10]
-            agc6=ain[11]
-            out+=agp*np.power(1.-x,etagp)*np.power(x,delgp)*(agc5*cheb_msht(5,x)+agc6*cheb_msht(6,x))
+    if two_terms:
+        out = (
+            agp
+            * np.power(1.0 - x, etagp)
+            * np.power(x, delgp)
+            * (
+                1.0
+                + agc1 * cheb_msht(1, x)
+                + agc2 * cheb_msht(2, x)
+                + agc3 * cheb_msht(3, x)
+                + agc4 * cheb_msht(4, x)
+            )
+        )
+        out += agm * np.power(1.0 - x, etagm) * np.power(x, delgm)
+        if cheb8:
+            agc5 = ain[10]
+            agc6 = ain[11]
+            out += (
+                agp
+                * np.power(1.0 - x, etagp)
+                * np.power(x, delgp)
+                * (agc5 * cheb_msht(5, x) + agc6 * cheb_msht(6, x))
+            )
     else:
-        out=agp*np.power(1.-x,etagp)*np.power(x,delgp)*(1.+agc1*cheb_msht(1,x)+agc2*cheb_msht(2,x)+agc3*cheb_msht(3,x)+agc4*cheb_msht(4,x)+etagm*cheb_msht(5,x)+delgm*cheb_msht(6,x))
-        if(basis_pars.g_cheb7):
-            out=out+agp*agm*cheb_msht(7,x)
-        if basis_pars.Cheb_8:
-            agc7=ain[10]
-            agc8=ain[11]
-            out+=agp*np.power(1.-x,etagp)*np.power(x,delgp)*(agc7*cheb_msht(7,x)+agc8*cheb_msht(8,x))
+        out = (
+            agp
+            * np.power(1.0 - x, etagp)
+            * np.power(x, delgp)
+            * (
+                1.0
+                + agc1 * cheb_msht(1, x)
+                + agc2 * cheb_msht(2, x)
+                + agc3 * cheb_msht(3, x)
+                + agc4 * cheb_msht(4, x)
+                + etagm * cheb_msht(5, x)
+                + delgm * cheb_msht(6, x)
+            )
+        )
+        if g_cheb7:
+            out = out + agp * agm * cheb_msht(7, x)
+        if cheb8:
+            agc7 = ain[10]
+            agc8 = ain[11]
+            out += (
+                agp
+                * np.power(1.0 - x, etagp)
+                * np.power(x, delgp)
+                * (agc7 * cheb_msht(7, x) + agc8 * cheb_msht(8, x))
+            )
     return out
 
 
-def dbub_msht(xin,ain):
-    aq=ain[0]
-    etaq=ain[1]
-    aqc1=ain[2]
-    aqc2=ain[3]
-    aqc3=ain[4]
-    aqc4=ain[5]
-    aqc5=ain[6]
-    aqc6=ain[7]
+@nb.njit
+def dbub_msht(x, ain, cheb8=False):
+    """MSHT parametrization for db - ub"""
+    aq = ain[0]
+    etaq = ain[1]
+    aqc1 = ain[2]
+    aqc2 = ain[3]
+    aqc3 = ain[4]
+    aqc4 = ain[5]
+    aqc5 = ain[6]
+    aqc6 = ain[7]
 
-    x=xin
-    if etaq < 0. and xin > 0.999:
-        x=0.999
-    
-    out=aq*np.power(1.-x,etaq)*(1.+aqc1*cheb_msht(1,x)+aqc2*cheb_msht(2,x)+aqc3*cheb_msht(3,x)+aqc4*cheb_msht(4,x)+aqc5*cheb_msht(5,x)+aqc6*cheb_msht(6,x))
+    if etaq < 0.0:
+        x = np.minimum(x, 0.999)
 
+    out = (
+        aq
+        * np.power(1.0 - x, etaq)
+        * (
+            1.0
+            + aqc1 * cheb_msht(1, x)
+            + aqc2 * cheb_msht(2, x)
+            + aqc3 * cheb_msht(3, x)
+            + aqc4 * cheb_msht(4, x)
+            + aqc5 * cheb_msht(5, x)
+            + aqc6 * cheb_msht(6, x)
+        )
+    )
 
-    if basis_pars.Cheb_8:
-        aqc7=ain[8]
-        aqc8=ain[9]
-        out+=aq*np.power(1.-x,etaq)*(aqc7*cheb_msht(7,x)+aqc8*cheb_msht(8,x))
+    if cheb8:
+        aqc7 = ain[8]
+        aqc8 = ain[9]
+        out += aq * np.power(1.0 - x, etaq) * (aqc7 * cheb_msht(7, x) + aqc8 * cheb_msht(8, x))
 
     return out
 
-def cheb_msht(i,x):
-    y=1.-2.*np.sqrt(x)
-    
-    if i==1:
-        out=y
-    elif i==2:
-        out=2.*np.power(y,2)-1.
-    elif i==3:
-        out=4.*np.power(y,3)-3.*y
-    elif i==4:
-        out=8.*np.power(y,4)-8.*np.power(y,2)+1.
-    elif i==5:
-        out=16.*np.power(y,5)-20*np.power(y,3)+5.*y
-    elif i==6:
-        out=32.*np.power(y,6)-48.*np.power(y,4)+18.*np.power(y,2)-1.
-    elif i==7:
-        out=64.*np.power(y,7)-112.*np.power(y,5)+56.*np.power(y,3)-7.*y
-    elif i==8:
-        out=128.*np.power(y,8)-256.*np.power(y,6)+160.*np.power(y,4)-32.*np.power(y,2)+1.
-        
+
+@nb.njit
+def cheb_msht(i, x):
+    """Returnts the i-th Chebyshev polynomial evaluated at
+    y = 1 - 2*sqrt(x)
+    """
+    y = 1.0 - 2.0 * np.sqrt(x)
+    # TODO: probably makes sense to use numpy's chebyshev polynomial here?
+
+    if i == 1:
+        out = y
+    elif i == 2:
+        out = 2.0 * np.power(y, 2) - 1.0
+    elif i == 3:
+        out = 4.0 * np.power(y, 3) - 3.0 * y
+    elif i == 4:
+        out = 8.0 * np.power(y, 4) - 8.0 * np.power(y, 2) + 1.0
+    elif i == 5:
+        out = 16.0 * np.power(y, 5) - 20 * np.power(y, 3) + 5.0 * y
+    elif i == 6:
+        out = 32.0 * np.power(y, 6) - 48.0 * np.power(y, 4) + 18.0 * np.power(y, 2) - 1.0
+    elif i == 7:
+        out = 64.0 * np.power(y, 7) - 112.0 * np.power(y, 5) + 56.0 * np.power(y, 3) - 7.0 * y
+    elif i == 8:
+        out = (
+            128.0 * np.power(y, 8)
+            - 256.0 * np.power(y, 6)
+            + 160.0 * np.power(y, 4)
+            - 32.0 * np.power(y, 2)
+            + 1.0
+        )
+
     return out
+
 
 def smin_norm(asm):
 
-#    xmin=1.0E-15
-#    xmax=0.99
-#    lxmin=np.log(xmin)
-#    lxmax=np.log(xmax)
+    int1 = sm1_int(asm, 0.0)
+    int2 = sm2_int(asm, 0.0)
 
-#    i1=quadrature(sm1_msht,lxmin,lxmax,args=(asm,),rtol=1.0e-04,maxiter=50)
-#    int1=i1[0]
-#    i2=quadrature(sm2_msht,lxmin,lxmax,args=(asm,),rtol=1.0e-04,maxiter=50)
-#    int2=i2[0]
-
-    int1=sm1_int(asm,0.)
-    int2=sm2_int(asm,0.)
-
-#    print('test',i1[0],i2[0],i1t,i2t)
-    
-    out=int2/int1
+    out = int2 / int1
     return out
 
-def sm1_int(ain,xmin):
 
-    asm=ain[0]
-    delsm=ain[1]-1.
-    etasm=ain[2]
-    x0=ain[3]
+@nb.njit
+def sm1_int(ain, xmin):
 
-    aqc1=ain[4]
-    aqc2=ain[5]
-    aqc3=ain[6]
-    aqc4=ain[7]
-    aqc5=ain[8]
-    aqc6=ain[9]
+    asm = ain[0]
+    delsm = ain[1] - 1.0
+    etasm = ain[2]
+    x0 = ain[3]
 
-    i1t=I(delsm,etasm,xmin)+aqc1*Ic1(delsm,etasm,xmin)+aqc2*Ic2(delsm,etasm,xmin)+aqc3*Ic3(delsm,etasm,xmin)+aqc4*Ic4(delsm,etasm,xmin)
-    i1t=i1t+aqc5*Ic5(delsm,etasm,xmin)+aqc6*Ic6(delsm,etasm,xmin)
-    i1t=i1t*asm
+    aqc1 = ain[4]
+    aqc2 = ain[5]
+    aqc3 = ain[6]
+    aqc4 = ain[7]
+    aqc5 = ain[8]
+    aqc6 = ain[9]
+
+    i1t = (
+        cheb.I(delsm, etasm)
+        + aqc1 * cheb.Ic1(delsm, etasm)
+        + aqc2 * cheb.Ic2(delsm, etasm)
+        + aqc3 * cheb.Ic3(delsm, etasm)
+        + aqc4 * cheb.Ic4(delsm, etasm)
+    )
+    i1t = i1t + aqc5 * cheb.Ic5(delsm, etasm) + aqc6 * cheb.Ic6(delsm, etasm)
+    i1t = i1t * asm
 
     return i1t
 
-def sm2_int(ain,xmin):
 
-    asm=ain[0]
-    delsm=ain[1]
-    etasm=ain[2]
-    x0=ain[3]
+@nb.njit
+def sm2_int(ain, xmin):
 
-    aqc1=ain[4]
-    aqc2=ain[5]
-    aqc3=ain[6]
-    aqc4=ain[7]
-    aqc5=ain[8]
-    aqc6=ain[9]
+    asm = ain[0]
+    delsm = ain[1]
+    etasm = ain[2]
+    x0 = ain[3]
 
-    i1t=I(delsm,etasm,xmin)+aqc1*Ic1(delsm,etasm,xmin)+aqc2*Ic2(delsm,etasm,xmin)+aqc3*Ic3(delsm,etasm,xmin)+aqc4*Ic4(delsm,etasm,xmin)
-    i1t=i1t+aqc5*Ic5(delsm,etasm,xmin)+aqc6*Ic6(delsm,etasm,xmin)
-    i1t=i1t*asm/x0
+    aqc1 = ain[4]
+    aqc2 = ain[5]
+    aqc3 = ain[6]
+    aqc4 = ain[7]
+    aqc5 = ain[8]
+    aqc6 = ain[9]
 
+    i1t = (
+        cheb.I(delsm, etasm)
+        + aqc1 * cheb.Ic1(delsm, etasm)
+        + aqc2 * cheb.Ic2(delsm, etasm)
+        + aqc3 * cheb.Ic3(delsm, etasm)
+        + aqc4 * cheb.Ic4(delsm, etasm)
+    )
+    i1t = i1t + aqc5 * cheb.Ic5(delsm, etasm) + aqc6 * cheb.Ic6(delsm, etasm)
+    i1t = i1t * asm / x0
 
     return i1t
 
-def qv_norm(iq,aq):
 
-#    xmin=1.0E-9
-#    xmax=0.99
-#    lxmin=np.log(xmin)
-#    lxmax=np.log(xmax)
-#    i1t=quadrature(lq_msht,lxmin,lxmax,args=(aq,),rtol=1.0e-03,maxiter=50)
-    
-    i1=qv_int(aq,1,0.)
+@nb.njit
+def qv_norm(iq, aq, cheb8=False):
+    i1 = qv_int(aq, 1, 0.0, cheb8=cheb8)
 
-    
-    if iq==1: #uv
-        out=2./i1
-    if iq==2: #dv
-        out=1./i1
-        
+    if iq == 1:  # uv
+        out = 2.0 / i1
+    elif iq == 2:  # dv
+        out = 1.0 / i1
+
     return out
-    
-def qv_int(aq,iq,xmin):
 
-    if iq==1:
-        delq=aq[1]-1.
+
+@nb.njit
+def qv_int(aq, iq, xmin, cheb8=False):
+
+    if iq == 1:
+        delq = aq[1] - 1.0
     else:
-        delq=aq[1]
-    etaq=aq[2]
-    aqc1=aq[3]
-    aqc2=aq[4]
-    aqc3=aq[5]
-    aqc4=aq[6]
-    aqc5=aq[7]
-    aqc6=aq[8]
+        delq = aq[1]
+    etaq = aq[2]
+    aqc1 = aq[3]
+    aqc2 = aq[4]
+    aqc3 = aq[5]
+    aqc4 = aq[6]
+    aqc5 = aq[7]
+    aqc6 = aq[8]
 
-    i1t=I(delq,etaq,xmin)+aqc1*Ic1(delq,etaq,xmin)+aqc2*Ic2(delq,etaq,xmin)+aqc3*Ic3(delq,etaq,xmin)+aqc4*Ic4(delq,etaq,xmin)
-    i1t=i1t+aqc5*Ic5(delq,etaq,xmin)+aqc6*Ic6(delq,etaq,xmin)
+    i1t = (
+        cheb.I(delq, etaq)
+        + aqc1 * cheb.Ic1(delq, etaq)
+        + aqc2 * cheb.Ic2(delq, etaq)
+        + aqc3 * cheb.Ic3(delq, etaq)
+        + aqc4 * cheb.Ic4(delq, etaq)
+    )
+    i1t = i1t + aqc5 * cheb.Ic5(delq, etaq) + aqc6 * cheb.Ic6(delq, etaq)
 
-    if basis_pars.Cheb_8:
-        aqc7=aq[9]
-        aqc8=aq[10]
-        i1t+=aqc7*Ic7(delq,etaq,xmin)+aqc8*Ic8(delq,etaq,xmin)
+    if cheb8:
+        aqc7 = aq[9]
+        aqc8 = aq[10]
+        i1t += aqc7 * cheb.Ic7(delq, etaq) + aqc8 * cheb.Ic8(delq, etaq)
 
-    i1t=i1t*aq[0]
+    i1t = i1t * aq[0]
 
     return i1t
+
 
 def msum_ag(pars):
 
-
-#    xmin=1.0E-15
-#    xmax=0.99
-#    lxmin=np.log(xmin)
-#    lxmax=np.log(xmax)
-    
-#    i1=quadrature(msum_pdf_ng,lxmin,lxmax,args=(pars,),rtol=1.0e-04,maxiter=50)
-#    outng=i1[0]
-
-#    ag=pars[36:46]
-#    i2=quadrature(lg1_msht,lxmin,lxmax,args=(ag,),rtol=1.0e-04,maxiter=50)
-#    outg1=i2[0]
-
-#    i3=quadrature(lg2_msht,lxmin,lxmax,args=(ag,),rtol=1.0e-04,maxiter=50)
-#    outg2=i3[0]
-    
     # auv=pars[0:9]
-    auv=pars[basis_pars.i_uv_min:basis_pars.i_uv_max].copy()
+    auv = pars[basis_pars.i_uv_min : basis_pars.i_uv_max].copy()
     # adv=pars[9:18]
-    adv=pars[basis_pars.i_dv_min:basis_pars.i_dv_max].copy()
+    adv = pars[basis_pars.i_dv_min : basis_pars.i_dv_max].copy()
     # asea=pars[18:27]
-    asea=pars[basis_pars.i_sea_min:basis_pars.i_sea_max].copy()
-    # ag=pars[36:46]  
-    ag=pars[basis_pars.i_g_min:basis_pars.i_g_max].copy()
+    asea = pars[basis_pars.i_sea_min : basis_pars.i_sea_max].copy()
+    # ag=pars[36:46]
+    ag = pars[basis_pars.i_g_min : basis_pars.i_g_max].copy()
     # fitcharm=pars[64:73]
-    fitcharm=pars[basis_pars.i_ch_min:basis_pars.i_ch_max].copy()
+    fitcharm = pars[basis_pars.i_ch_min : basis_pars.i_ch_max].copy()
 
-    xmin=0.
+    xmin = 0.0
 
-
-    outng=qv_int(auv,2,xmin)+qv_int(adv,2,xmin)+qv_int(asea,2,xmin)+qv_int(fitcharm,2,xmin)
-
-    
+    c8 = basis_pars.Cheb_8
+    outng = (
+        qv_int(auv, 2, xmin, c8)
+        + qv_int(adv, 2, xmin, c8)
+        + qv_int(asea, 2, xmin, c8)
+        + qv_int(fitcharm, 2, xmin, c8)
+    )
 
     # outng=0.66336
     # outng=0.67364
@@ -851,17 +978,21 @@ def msum_ag(pars):
     # outng=0.673202645641724
     # # pch cheb 5
     # outng=0.6764550686407598
-    # # fch cheb 4   
+    # # fch cheb 4
     # outng=0.6071106839785037
-    # # fch cheb 5    
+    # # fch cheb 5
     # outng=0.608941296908194
 
-    outg1=int_g1_msht(ag,xmin)
-    outg2=int_g2_msht(ag,xmin)
-
+    outg1 = int_g1_msht(
+        ag,
+        xmin,
+        two_terms=basis_pars.g_second_term,
+        cheb8=c8,
+        g_cheb7=basis_pars.g_cheb7,
+    )
+    outg2 = int_g2_msht(ag, xmin, two_terms=basis_pars.g_second_term)
 
     # outng=auv[1]
- 
 
     # print(qv_int(auv,2,xmin),qv_int(adv,2,xmin),qv_int(asea,2,xmin),qv_int(afitcharm,2,xmin))
     # print(outng)
@@ -878,233 +1009,214 @@ def msum_ag(pars):
 
     # outng=0.6764846130843789
 
-    out=1.-outng-outg2
-    out=out/outg1
+    out = 1.0 - outng - outg2
+    out = out / outg1
 
     return out
 
-def int_g1_msht(ain,xmin):
 
-    agp=ain[0]
-    etagp=ain[1]
-    delgp=ain[2]
-    agc1=ain[3]
-    agc2=ain[4]
-    agc3=ain[5]
-    agc4=ain[6]
-    agm=ain[7]
-    etagm=ain[8]
-    delgm=ain[9]
+@nb.njit
+def int_g1_msht(ain, xmin, two_terms=False, g_cheb7=False, cheb8=False):
+    agp = ain[0]
+    etagp = ain[1]
+    delgp = ain[2]
+    agc1 = ain[3]
+    agc2 = ain[4]
+    agc3 = ain[5]
+    agc4 = ain[6]
+    agm = ain[7]
+    etagm = ain[8]
+    delgm = ain[9]
 
-    if(basis_pars.g_second_term):
-        out=I(delgp,etagp,xmin)+agc1*Ic1(delgp,etagp,xmin)+agc2*Ic2(delgp,etagp,xmin)+agc3*Ic3(delgp,etagp,xmin)+agc4*Ic4(delgp,etagp,xmin)
-        if basis_pars.Cheb_8:
-            agc5=ain[10]
-            agc6=ain[11]
-            out+=agc5*Ic5(delgp,etagp,xmin)+agc6*Ic6(delgp,etagp,xmin)
+    if two_terms:
+        out = (
+            cheb.I(delgp, etagp)
+            + agc1 * cheb.Ic1(delgp, etagp)
+            + agc2 * cheb.Ic2(delgp, etagp)
+            + agc3 * cheb.Ic3(delgp, etagp)
+            + agc4 * cheb.Ic4(delgp, etagp)
+        )
+        if cheb8:
+            agc5 = ain[10]
+            agc6 = ain[11]
+            out += agc5 * cheb.Ic5(delgp, etagp) + agc6 * cheb.Ic6(delgp, etagp)
     else:
-        out=I(delgp,etagp,xmin)+agc1*Ic1(delgp,etagp,xmin)+agc2*Ic2(delgp,etagp,xmin)+agc3*Ic3(delgp,etagp,xmin)+agc4*Ic4(delgp,etagp,xmin)+etagm*Ic5(delgp,etagp,xmin)+delgm*Ic6(delgp,etagp,xmin)
-        if(basis_pars.g_cheb7):
-            out=out+agm*Ic7(delgp,etagp,xmin)
-        if basis_pars.Cheb_8:
-            agc7=ain[10]
-            agc8=ain[11]
-            out+=agc7*Ic7(delgp,etagp,xmin)+agc8*Ic8(delgp,etagp,xmin)
+        out = (
+            cheb.I(delgp, etagp)
+            + agc1 * cheb.Ic1(delgp, etagp)
+            + agc2 * cheb.Ic2(delgp, etagp)
+            + agc3 * cheb.Ic3(delgp, etagp)
+            + agc4 * cheb.Ic4(delgp, etagp)
+            + etagm * cheb.Ic5(delgp, etagp)
+            + delgm * cheb.Ic6(delgp, etagp)
+        )
+        if g_cheb7:
+            out = out + agm * cheb.Ic7(delgp, etagp)
+        if cheb8:
+            agc7 = ain[10]
+            agc8 = ain[11]
+            out += agc7 * cheb.Ic7(delgp, etagp) + agc8 * cheb.Ic8(delgp, etagp)
 
-    out=out*agp
-
-    return out
-
-def int_g2_msht(ain,xmin):
-
-    agp=ain[0]
-    etagp=ain[1]
-    delgp=ain[2]
-    agc1=ain[3]
-    agc2=ain[4]
-    agc3=ain[5]
-    agc4=ain[6]
-    agm=ain[7]
-    etagm=ain[8]
-    delgm=ain[9]
-
-    
-    if(basis_pars.g_second_term):
-        out=agm*I(delgm,etagm,xmin)
-    else:
-        out=0.
-
+    out = out * agp
 
     return out
 
+
+@nb.njit
+def int_g2_msht(ain, xmin, two_terms=False):
+
+    if not two_terms:
+        return 0.0
+
+    agm = ain[7]
+    etagm = ain[8]
+    delgm = ain[9]
+
+    return agm * cheb.I(delgm, etagm)
 
 
 def sumrules(parin):
     """
     Modify the set of input parameters so that the sum rules are fulfilled"""
-    
-    out=parin.copy()
+    out = parin.copy()
 
     # asm=out[46:56]
-    asm=out[basis_pars.i_sm_min:basis_pars.i_sm_max].copy()
+    asm = out[basis_pars.i_sm_min : basis_pars.i_sm_max].copy()
 
     if basis_pars.dvd_eq_uvd:
         # out[10]=out[1]
-        out[basis_pars.i_dv_min+1]=out[basis_pars.i_uv_min+1]
+        out[basis_pars.i_dv_min + 1] = out[basis_pars.i_uv_min + 1]
     if basis_pars.asp_fix:
         # out[28]=out[19]
-        out[basis_pars.i_sp_min+1]=out[basis_pars.i_sea_min+1]
-
+        out[basis_pars.i_sp_min + 1] = out[basis_pars.i_sea_min + 1]
 
     if basis_pars.t8_int:
         # asea=out[18:27].copy()
-        asea=out[basis_pars.i_sea_min:basis_pars.i_sea_max].copy()
+        asea = out[basis_pars.i_sea_min : basis_pars.i_sea_max].copy()
         # asp=out[27:36].copy()
-        asp=out[basis_pars.i_sp_min:basis_pars.i_sp_max].copy()
-        norm_sea=q_msht_lowx_norm(asea)  
-        asp_new=sp_norm_fix(norm_sea,asp)
+        asp = out[basis_pars.i_sp_min : basis_pars.i_sp_max].copy()
+        norm_sea = q_msht_lowx_norm(asea)
+        asp_new = sp_norm_fix(norm_sea, asp)
         # out[27]=asp_new
-        out[basis_pars.i_sp_min]=asp_new
+        out[basis_pars.i_sp_min] = asp_new
 
     # auv=out[0:9].copy()
-    auv=out[basis_pars.i_uv_min:basis_pars.i_uv_max].copy()
+    auv = out[basis_pars.i_uv_min : basis_pars.i_uv_max].copy()
     # adv=out[9:18].copy()
-    adv=out[basis_pars.i_dv_min:basis_pars.i_dv_max].copy()
+    adv = out[basis_pars.i_dv_min : basis_pars.i_dv_max].copy()
 
-    x0=smin_norm(asm)
+    x0 = smin_norm(asm)
 
     # out[49]=x0
-    out[basis_pars.i_sm_min+3]=x0
+    out[basis_pars.i_sm_min + 3] = x0
 
-    out[0]=qv_norm(1,auv)
+    out[0] = qv_norm(1, auv, cheb8=basis_pars.Cheb_8)
     # print('out0 =',out[0])
     # out[9]=qv_norm(2,adv)
-    out[basis_pars.i_dv_min]=qv_norm(2,adv)
-    
-    ag=msum_ag(out)
+    out[basis_pars.i_dv_min] = qv_norm(2, adv, cheb8=basis_pars.Cheb_8)
+
+    ag = msum_ag(out)
 
     # out[36]=ag
-    out[basis_pars.i_g_min]=ag
-
-
-    # xmin=1.0E-50
-    # xmax=1.0E-12
-    # xmin=1.0E-9
-    # xmax=0.999
-    # lxmin=np.log(xmin)
-    # lxmax=np.log(xmax)
-
-
-    # agpar=out[basis_pars.i_g_min:basis_pars.i_g_max]
-    # i2=quadrature(lg1_msht,lxmin,lxmax,args=(agpar,),rtol=1.0e-04,maxiter=50)
-    # outg1=i2[0]
-
-    # i3=quadrature(lg2_msht,lxmin,lxmax,args=(agpar,),rtol=1.0e-04,maxiter=50)
-    # outg2=i3[0]
-
-    # print(outg1,outg2,outg1+outg2)
-
-    # outg1=int_g1_msht(agpar,xmin)
-    # outg2=int_g2_msht(agpar,xmin)
-
-    # print(outg1,outg2,outg1+outg2)
-
-    # exit()
-
-    # agarr=out[36:46].copy()
-    # test=g_msht(1e-1,agarr)
-
-    # print('g(1e-1,1) = ',test)
-    # exit()
-
+    out[basis_pars.i_g_min] = ag
 
     return out
 
+
+@functools.cache
 def initpars():
     """Prepare the whole set of initial parameters"""
-    auv=uv_init()
-    adv=dv_init()
-    asea=sea_init()
-    asp=sp_init()
-    ag=g_init()
-    asm=smin_init()
-    adbub=dbub_init()
-    fitcharm=fitcharm_init()
+    auv = uv_init()
+    adv = dv_init()
+    asea = sea_init()
+    asp = sp_init()
+    ag = g_init()
+    asm = smin_init()
+    adbub = dbub_init()
+    fitcharm = fitcharm_init()
 
-    # pdfpars=np.concatenate((auv,adv,asea,asp,ag,asm,adbub))  
-    pdfpars=np.concatenate((auv,adv,asea,asp,ag,asm,adbub,fitcharm))  
+    # pdfpars=np.concatenate((auv,adv,asea,asp,ag,asm,adbub))
+    pdfpars = np.concatenate((auv, adv, asea, asp, ag, asm, adbub, fitcharm))
 
     return pdfpars
+
 
 def g_init():
 
     # a=pdf_pars.parsin[36:46]
-    a=pdf_pars.parsin[basis_pars.i_g_min:basis_pars.i_g_max]
-    a[0]=1. # Set to one so overwritten easily by sum rule   
-    
+    a = pdf_pars.parsin[basis_pars.i_g_min : basis_pars.i_g_max]
+    a[0] = 1.0  # Set to one so overwritten easily by sum rule
+
     return a
+
 
 def smin_init():
 
     # a=pdf_pars.parsin[46:56]
-    a=pdf_pars.parsin[basis_pars.i_sm_min:basis_pars.i_sm_max]
-    a[3]=1. # Set to one so overwritten easily by sum rule 
-    
+    a = pdf_pars.parsin[basis_pars.i_sm_min : basis_pars.i_sm_max]
+    a[3] = 1.0  # Set to one so overwritten easily by sum rule
+
     return a
+
 
 def uv_init():
 
-    # a=pdf_pars.parsin[0:9] 
-    a=pdf_pars.parsin[basis_pars.i_uv_min:basis_pars.i_uv_max]
-    a[0]=1. # Set to one so overwritten easily by sum rule  
+    # a=pdf_pars.parsin[0:9]
+    a = pdf_pars.parsin[basis_pars.i_uv_min : basis_pars.i_uv_max]
+    a[0] = 1.0  # Set to one so overwritten easily by sum rule
 
     return a
+
 
 def dv_init():
 
     # a=pdf_pars.parsin[9:18]
-    a=pdf_pars.parsin[basis_pars.i_dv_min:basis_pars.i_dv_max]
-    a[0]=1. # Set to one so overwritten easily by sum rule  
-    
+    a = pdf_pars.parsin[basis_pars.i_dv_min : basis_pars.i_dv_max]
+    a[0] = 1.0  # Set to one so overwritten easily by sum rule
+
     return a
+
 
 def sp_init():
 
     # a=pdf_pars.parsin[27:36]
-    a=pdf_pars.parsin[basis_pars.i_sp_min:basis_pars.i_sp_max]
+    a = pdf_pars.parsin[basis_pars.i_sp_min : basis_pars.i_sp_max]
 
     return a
 
-    
+
 def fitcharm_init():
 
     # a=pdf_pars.parsin[64:73]
-    a=pdf_pars.parsin[basis_pars.i_ch_min:basis_pars.i_ch_max]
+    a = pdf_pars.parsin[basis_pars.i_ch_min : basis_pars.i_ch_max]
 
     return a
+
 
 def sea_init():
 
     # a=pdf_pars.parsin[18:27]
-    a=pdf_pars.parsin[basis_pars.i_sea_min:basis_pars.i_sea_max]
+    a = pdf_pars.parsin[basis_pars.i_sea_min : basis_pars.i_sea_max]
 
     return a
+
 
 def dbub_init():
 
     # a=pdf_pars.parsin[56:64]
-    a=pdf_pars.parsin[basis_pars.i_dbub_min:basis_pars.i_dbub_max]
-    
+    a = pdf_pars.parsin[basis_pars.i_dbub_min : basis_pars.i_dbub_max]
+
     return a
+
 
 def parset(af, parin, are_free=None):
     """
-        Takes an array of free parameters (``af``)
-        and an array with all parameters in the problem (``parin``).
-        Returns an array where the free parameters of ``parin`` are substituted with those in ``af``.
-        Whether the parameters are to be considered free or not is given by the ``are_free`` array.
+    Takes an array of free parameters (``af``)
+    and an array with all parameters in the problem (``parin``).
+    Returns an array where the free parameters of ``parin`` are substituted with those in ``af``.
+    Whether the parameters are to be considered free or not is given by the ``are_free`` array.
 
-        Note: the parameters in ``af`` should be order like in ``parin``.
+    Note: the parameters in ``af`` should be order like in ``parin``.
     """
     if are_free is None:
         are_free = pdf_pars.par_isf
@@ -1113,26 +1225,30 @@ def parset(af, parin, are_free=None):
     out[are_free.astype(bool)] = af
     return out
 
-def parcheck(pars):
 
-    err=False
-    
-    delgp=pars[basis_pars.i_g_min+2]
-    delgm=pars[basis_pars.i_g_min+9]
-    delsea=pars[basis_pars.i_sea_min+1]
-    delsp=pars[basis_pars.i_sp_min+1]
-    etagp=pars[basis_pars.i_g_min+1]
-    etagm=pars[basis_pars.i_g_min+8]
-    etasea=pars[basis_pars.i_sea_min+2]
-    etasp=pars[basis_pars.i_sp_min+2]
-    delu=pars[1]
-    deld=pars[basis_pars.i_dv_min+1]
-    delsm=pars[basis_pars.i_sm_min+1]
-    etau=pars[2]
-    etad=pars[basis_pars.i_dv_min+2]
-    etasm=pars[basis_pars.i_sm_min+2]
-    etafitcharm=pars[basis_pars.i_ch_min+2]
-    delfitcharm=pars[basis_pars.i_ch_min+1]
+def parcheck(pars: np.ndarray) -> bool:
+    """
+    Check all parameters,  return True if any error condition is met
+    """
+
+    err = False
+
+    delgp = pars[basis_pars.i_g_min + 2]
+    delgm = pars[basis_pars.i_g_min + 9]
+    delsea = pars[basis_pars.i_sea_min + 1]
+    delsp = pars[basis_pars.i_sp_min + 1]
+    etagp = pars[basis_pars.i_g_min + 1]
+    etagm = pars[basis_pars.i_g_min + 8]
+    etasea = pars[basis_pars.i_sea_min + 2]
+    etasp = pars[basis_pars.i_sp_min + 2]
+    delu = pars[1]
+    deld = pars[basis_pars.i_dv_min + 1]
+    delsm = pars[basis_pars.i_sm_min + 1]
+    etau = pars[2]
+    etad = pars[basis_pars.i_dv_min + 2]
+    etasm = pars[basis_pars.i_sm_min + 2]
+    etafitcharm = pars[basis_pars.i_ch_min + 2]
+    delfitcharm = pars[basis_pars.i_ch_min + 1]
 
     # delgp=pars[38]
     # delgm=pars[45]
@@ -1151,224 +1267,232 @@ def parcheck(pars):
     # etafitcharm=pars[66]
     # delfitcharm=pars[65]
 
-
     # etadbub=pars[51]
 
     # if etadbub < 0:
     #     print('PARCHECK : etadbub < 0')
     #     err=True
-    
-    if etasm > 1000.:
-        print('PARCHECK : etasm > 1000.')
-        err=True
+
+    if etasm > 1000.0:
+        print("PARCHECK : etasm > 1000.")
+        err = True
 
     if etasm < 0:
-        print('PARCHECK : etasm < 0')
-        err=True
-    
+        print("PARCHECK : etasm < 0")
+        err = True
+
     if etau < 0:
-        print('PARCHECK : etau < 0')
-        err=True
-        
+        print("PARCHECK : etau < 0")
+        err = True
+
     if etad < 0:
-        print('PARCHECK : etad < 0')
-        err=True
-    
+        print("PARCHECK : etad < 0")
+        err = True
+
     if delsm < 0:
-        print('PARCHECK : delsm < 0')
-        err=True
-    
+        print("PARCHECK : delsm < 0")
+        err = True
+
     if delu < 0:
-        print('PARCHECK : delu < 0')
-        err=True
+        print("PARCHECK : delu < 0")
+        err = True
 
     if deld < 0:
-        print('PARCHECK : deld < 0')
-        err=True
+        print("PARCHECK : deld < 0")
+        err = True
 
     if etasea < 0:
-        print('PARCHECK : etasea < 0')
-        err=True
+        print("PARCHECK : etasea < 0")
+        err = True
 
     if etasp < 0:
-        print('PARCHECK : etasp < 0')
-        err=True
+        print("PARCHECK : etasp < 0")
+        err = True
 
     if etafitcharm < 0:
-        print('PARCHECK : etafitcharm < 0')
-        err=True
-    
-    if etagp < 0:
-        print('PARCHECK : etagp < 0')
-        err=True
-    
-    if delgp < -1:
-        print('PARCHECK : delgp < -1')
-        err=True
+        print("PARCHECK : etafitcharm < 0")
+        err = True
 
-    gptest=I(delgp,etagp,0.)
+    if etagp < 0:
+        print("PARCHECK : etagp < 0")
+        err = True
+
+    if delgp < -1:
+        print("PARCHECK : delgp < -1")
+        err = True
+
+    gptest = cheb.I(delgp, etagp)
     if gptest < 1e-50:
-        print('PARCHECK : delgp,etagp too high - unstable')
-        err=True
+        print("PARCHECK : delgp,etagp too high - unstable")
+        err = True
 
     if delsea < -1:
-        print('PARCHECK : delsea < -1')
-        err=True
+        print("PARCHECK : delsea < -1")
+        err = True
 
     if delsp < -1:
-        print('PARCHECK : delsp < -1')
-        err=True
+        print("PARCHECK : delsp < -1")
+        err = True
 
     if delfitcharm < -1:
-        print('PARCHECK : delfitcharm < -1')
-        err=True
+        print("PARCHECK : delfitcharm < -1")
+        err = True
 
-    if(basis_pars.g_second_term):
-        
+    if basis_pars.g_second_term:
+
         if etagm < 0:
-            print('PARCHECK : etagm < 0')
-            err=True
-            
+            print("PARCHECK : etagm < 0")
+            err = True
+
         if delgm < -1:
-            print('PARCHECK : delgm < -1')
-            err=True 
+            print("PARCHECK : delgm < -1")
+            err = True
 
     return err
-        
+
+
 #    print('test',delg,delgp)
 
-def parinc_eps(parin,ipar,eps):
 
-    npar=pdf_pars.par_free_i[ipar]
+def parinc_eps(parin, ipar, eps):
 
-    eps_n=eps*np.abs(parin[npar])
+    npar = pdf_pars.par_free_i[ipar]
+
+    eps_n = eps * np.abs(parin[npar])
 
     if np.abs(parin[npar]) < 1e-8:
-        eps_n=1e-12
+        eps_n = 1e-12
 
     return eps_n
 
-def parinc_newmin(parin,ipar,eps, true_idx=False):
+
+def parinc_newmin(parin, ipar, eps, true_idx=False):
 
     if true_idx:
         npar = ipar
     else:
-        npar=pdf_pars.par_free_i[ipar]
+        npar = pdf_pars.par_free_i[ipar]
 
     # eps_n=eps*np.abs(parin[npar])
-    eps_n=eps
+    eps_n = eps
 
     # if np.abs(parin[npar]) < 1e-8:
     #     eps_n=1e-12
 
-    out=parin.copy()
-    out[npar]=out[npar]+eps_n
+    out = parin.copy()
+    out[npar] = out[npar] + eps_n
 
     ###  sum rules...
 
     if basis_pars.asp_fix:
-        out[basis_pars.i_sp_min+1]=out[basis_pars.i_sea_min+1]
+        out[basis_pars.i_sp_min + 1] = out[basis_pars.i_sea_min + 1]
     if basis_pars.dvd_eq_uvd:
-        out[basis_pars.i_dv_min+1]=out[basis_pars.i_uv_min+1]
+        out[basis_pars.i_dv_min + 1] = out[basis_pars.i_uv_min + 1]
 
-
-    out[basis_pars.i_sm_min+3]=1.
-    out[0]=1.
-    out[basis_pars.i_dv_min]=1.
-    out[basis_pars.i_g_min]=1.
+    out[basis_pars.i_sm_min + 3] = 1.0
+    out[0] = 1.0
+    out[basis_pars.i_dv_min] = 1.0
+    out[basis_pars.i_g_min] = 1.0
 
     if basis_pars.t8_int:
-        asea=out[basis_pars.i_sea_min:basis_pars.i_sea_max].copy()
-        asp=out[basis_pars.i_sp_min:basis_pars.i_sp_max].copy()
-        norm_sea=q_msht_lowx_norm(asea)  
-        asp_new=sp_norm_fix(norm_sea,asp)
-        out[basis_pars.i_sp_min]=asp_new
+        asea = out[basis_pars.i_sea_min : basis_pars.i_sea_max].copy()
+        asp = out[basis_pars.i_sp_min : basis_pars.i_sp_max].copy()
+        norm_sea = q_msht_lowx_norm(asea)
+        asp_new = sp_norm_fix(norm_sea, asp)
+        out[basis_pars.i_sp_min] = asp_new
 
-    asm=out[basis_pars.i_sm_min:basis_pars.i_sm_max].copy()
-    auv=out[basis_pars.i_uv_min:basis_pars.i_uv_max].copy()
+    asm = out[basis_pars.i_sm_min : basis_pars.i_sm_max].copy()
+    auv = out[basis_pars.i_uv_min : basis_pars.i_uv_max].copy()
 
-    adv=out[basis_pars.i_dv_min:basis_pars.i_dv_max].copy()
-    x0=smin_norm(asm)
-    
-    out[basis_pars.i_sm_min+3]=x0
+    adv = out[basis_pars.i_dv_min : basis_pars.i_dv_max].copy()
+    x0 = smin_norm(asm)
 
-    out[0]=qv_norm(1,auv)
+    out[basis_pars.i_sm_min + 3] = x0
 
-    out[basis_pars.i_dv_min]=qv_norm(2,adv)
+    out[0] = qv_norm(1, auv)
 
-    ag=msum_ag(out)
+    out[basis_pars.i_dv_min] = qv_norm(2, adv)
 
-    out[basis_pars.i_g_min]=ag
+    ag = msum_ag(out)
 
-    return (out,eps_n)
+    out[basis_pars.i_g_min] = ag
 
-def parinc(parin,ipar,epar):
+    return (out, eps_n)
 
-    npar=pdf_pars.par_free_i[ipar]
 
-    eps=1e-5 # was 1e-5 before
-    eps_n=eps*np.abs(parin[npar])
+def parinc(parin, ipar, epar, eps=1e-5):
+    """
+    Takes an array of parameters parin
+    and modifies parameter ipar by an epsilon eps.
+    epar defines the kind of modification.
+    Creates a copy of parin to avoid modifying the array in-place
+    """
+
+    npar = pdf_pars.par_free_i[ipar]
+
+    eps_n = eps * np.abs(parin[npar])
 
     if np.abs(parin[npar]) < 1e-8:
-        eps_n=1e-12
+        eps_n = 1e-12
 
-    out=parin.copy()
-    if epar==1:
-        out[npar]=out[npar]+eps_n
-    elif epar==2:
-        out[npar]=out[npar]-eps_n
-    elif epar==3:
-        out[npar]=out[npar]-eps_n*2.
-    elif epar==4:
-        out[npar]=out[npar]+eps_n*2.
+    out = parin.copy()
+    if epar == 1:
+        out[npar] = out[npar] + eps_n
+    elif epar == 2:
+        out[npar] = out[npar] - eps_n
+    elif epar == 3:
+        out[npar] = out[npar] - eps_n * 2.0
+    elif epar == 4:
+        out[npar] = out[npar] + eps_n * 2.0
+    else:
+        raise ValueError(f"Wrong {epar=} in parinc")
 
     ###  sum rules...
 
     if basis_pars.asp_fix:
         # out[28]=out[19]
-        out[basis_pars.i_sp_min+1]=out[basis_pars.i_sea_min+1]
+        out[basis_pars.i_sp_min + 1] = out[basis_pars.i_sea_min + 1]
     if basis_pars.dvd_eq_uvd:
         # out[10]=out[1]
-        out[basis_pars.i_dv_min+1]=out[basis_pars.i_uv_min+1]
+        out[basis_pars.i_dv_min + 1] = out[basis_pars.i_uv_min + 1]
 
-
-    out[basis_pars.i_sm_min+3]=1.
-    out[0]=1.
-    out[basis_pars.i_dv_min]=1.
-    out[basis_pars.i_g_min]=1.
+    out[basis_pars.i_sm_min + 3] = 1.0
+    out[0] = 1.0
+    out[basis_pars.i_dv_min] = 1.0
+    out[basis_pars.i_g_min] = 1.0
 
     if basis_pars.t8_int:
         # asea=out[18:27].copy()
-        asea=out[basis_pars.i_sea_min:basis_pars.i_sea_max].copy()
+        asea = out[basis_pars.i_sea_min : basis_pars.i_sea_max].copy()
         # asp=out[27:36].copy()
-        asp=out[basis_pars.i_sp_min:basis_pars.i_sp_max].copy()
-        norm_sea=q_msht_lowx_norm(asea)  
-        asp_new=sp_norm_fix(norm_sea,asp)
+        asp = out[basis_pars.i_sp_min : basis_pars.i_sp_max].copy()
+        norm_sea = q_msht_lowx_norm(asea)
+        asp_new = sp_norm_fix(norm_sea, asp)
         # out[27]=asp_new
-        out[basis_pars.i_sp_min]=asp_new
+        out[basis_pars.i_sp_min] = asp_new
 
     # asm=out[46:56].copy()
-    asm=out[basis_pars.i_sm_min:basis_pars.i_sm_max].copy()
+    asm = out[basis_pars.i_sm_min : basis_pars.i_sm_max].copy()
     # auv=out[0:9].copy()
-    auv=out[basis_pars.i_uv_min:basis_pars.i_uv_max].copy()
+    auv = out[basis_pars.i_uv_min : basis_pars.i_uv_max].copy()
 
     # adv=out[9:18]
-    adv=out[basis_pars.i_dv_min:basis_pars.i_dv_max].copy()
-    x0=smin_norm(asm)
-    
-    # out[49]=x0
-    out[basis_pars.i_sm_min+3]=x0
+    adv = out[basis_pars.i_dv_min : basis_pars.i_dv_max].copy()
+    x0 = smin_norm(asm)
 
-    out[0]=qv_norm(1,auv)
+    # out[49]=x0
+    out[basis_pars.i_sm_min + 3] = x0
+
+    out[0] = qv_norm(1, auv)
     # print('out =',out[0])
     # LHL NEW TO DELETE
     # out[0]=2.344063147372577
     # out[9]=qv_norm(2,adv)
-    out[basis_pars.i_dv_min]=qv_norm(2,adv)
+    out[basis_pars.i_dv_min] = qv_norm(2, adv)
 
-    ag=msum_ag(out)
+    ag = msum_ag(out)
 
     # out[36]=ag
-    out[basis_pars.i_g_min]=ag
+    out[basis_pars.i_g_min] = ag
 
-    return (out,eps_n)
+    return (out, eps_n)

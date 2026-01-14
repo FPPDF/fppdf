@@ -1,27 +1,8 @@
-import warnings as wa
-from validphys import core
 from validphys.api import API
-from validphys.fkparser import load_fktable
-from validphys.loader import Loader
-from validphys.convolution import predictions, linear_predictions, central_predictions
-import validphys.convolution as conv
-# from validphys.results import experiments_index
-import validphys.results as rs
-from validphys.covmats import covmat_from_systematics
 import numpy as np
-from nnpdf_data.commondataparser import load_commondata
-import validphys.commondata as cdat
-import pandas as pd
-from validphys.calcutils import calc_chi2
-import scipy.linalg as la
 import os
 import lhapdf
-import shutil as sh
-from validphys.covmats import dataset_inputs_covmat_from_systematics
-from validphys.pseudodata import make_replica
 from scipy.optimize import minimize
-from scipy.optimize import least_squares
-import itertools as IT
 from reportengine.utils import yaml_safe
 import time
 import sys
@@ -138,6 +119,7 @@ fit_pars.lhrep=fitp.get("lhrep")
 if fit_pars.lhrep is None:
     fit_pars.lhrep=0
 fit_pars.nmcpd_diag=fitp.get("nmcpd_diag")
+fit_pars.lampos = fitp.get("lampos", 1e3)
 chi2_pars.t0_noderivin=fitp.get("t0_noderivin")
 fit_pars.deld_const=fitp.get("deld_const")
 fit_pars.dset_type=fitp.get("dset_type")
@@ -283,6 +265,10 @@ fit_pars.alphas=0.118
 tzero=time.process_time()
 
 print('inputnam = ',inout_pars.inputnam)
+
+
+##### TODO: start populating the shared data here
+shared_populate_data()
 
 if inout_pars.readcov:
     chi2_pars.t0=True
@@ -475,7 +461,7 @@ elif(use_levmar):
             dload_pars.dcov=1
 
 
-        if fit_pars.nnpdf_pos:
+        if fit_pars.nnpdf_pos and False:
             # TODO: there are a few calls to levmar here that need to be treated
             if(inout_pars.pdin):
                 chi2_pars.t0=False

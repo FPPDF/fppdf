@@ -76,67 +76,68 @@ def evgrido():
     elif fit_pars.theoryidi==212:
         qin=1.00
 
-    for i in range(0,195):
+    for i, x in enumerate(xgrid.flat):
 
         if(pdf_pars.lhin):
             test[i,0]=0.
             test[i,1]=0.
-            test[i,2]=pdfs[0].xfxQ(-4,xgrid[i],qin)
-            test[i,3]=pdfs[0].xfxQ(-3,xgrid[i],qin)
-            test[i,4]=pdfs[0].xfxQ(-2,xgrid[i],qin)
-            test[i,5]=pdfs[0].xfxQ(-1,xgrid[i],qin)
-            test[i,6]=pdfs[0].xfxQ(0,xgrid[i],qin)
-            test[i,7]=pdfs[0].xfxQ(1,xgrid[i],qin)
-            test[i,8]=pdfs[0].xfxQ(2,xgrid[i],qin)
-            test[i,9]=pdfs[0].xfxQ(3,xgrid[i],qin)
-            test[i,10]=pdfs[0].xfxQ(4,xgrid[i],qin)
+            test[i,2]=pdfs[0].xfxQ(-4,x,qin)
+            test[i,3]=pdfs[0].xfxQ(-3,x,qin)
+            test[i,4]=pdfs[0].xfxQ(-2,x,qin)
+            test[i,5]=pdfs[0].xfxQ(-1,x,qin)
+            test[i,6]=pdfs[0].xfxQ(0,x,qin)
+            test[i,7]=pdfs[0].xfxQ(1,x,qin)
+            test[i,8]=pdfs[0].xfxQ(2,x,qin)
+            test[i,9]=pdfs[0].xfxQ(3,x,qin)
+            test[i,10]=pdfs[0].xfxQ(4,x,qin)
             test[i,11]=0.
             test[i,12]=0.
             test[i,13]=0.
         else:
             test[i,0]=0.
             test[i,1]=0.
-            test[i,2]=pdfs_msht(-4,pdf_pars.pdfparsi,xgrid[i])
-            test[i,3]=pdfs_msht(-3,pdf_pars.pdfparsi,xgrid[i])
-            test[i,4]=pdfs_msht(-2,pdf_pars.pdfparsi,xgrid[i])
-            test[i,5]=pdfs_msht(-1,pdf_pars.pdfparsi,xgrid[i])
-            test[i,6]=pdfs_msht(0,pdf_pars.pdfparsi,xgrid[i])
-            test[i,7]=pdfs_msht(1,pdf_pars.pdfparsi,xgrid[i])
-            test[i,8]=pdfs_msht(2,pdf_pars.pdfparsi,xgrid[i])
-            test[i,9]=pdfs_msht(3,pdf_pars.pdfparsi,xgrid[i])
-            test[i,10]=pdfs_msht(4,pdf_pars.pdfparsi,xgrid[i])
+            test[i,2]=pdfs_msht(-4,pdf_pars.pdfparsi,x)
+            test[i,3]=pdfs_msht(-3,pdf_pars.pdfparsi,x)
+            test[i,4]=pdfs_msht(-2,pdf_pars.pdfparsi,x)
+            test[i,5]=pdfs_msht(-1,pdf_pars.pdfparsi,x)
+            test[i,6]=pdfs_msht(0,pdf_pars.pdfparsi,x)
+            test[i,7]=pdfs_msht(1,pdf_pars.pdfparsi,x)
+            test[i,8]=pdfs_msht(2,pdf_pars.pdfparsi,x)
+            test[i,9]=pdfs_msht(3,pdf_pars.pdfparsi,x)
+            test[i,10]=pdfs_msht(4,pdf_pars.pdfparsi,x)
             test[i,11]=0.
             test[i,12]=0.
             test[i,13]=0.
 
-
+    # Why is this one separated?
+    xlast = xgrid[195][0]
     if(pdf_pars.lhin):
         test[195,0]=0.
         test[195,1]=0.
-        test[195,2]=pdfs[0].xfxQ(-4,xgrid[195],qin)
-        test[195,3]=pdfs[0].xfxQ(-3,xgrid[195],qin)
-        test[195,4]=pdfs[0].xfxQ(-2,xgrid[195],qin)
-        test[195,5]=pdfs[0].xfxQ(-1,xgrid[195],qin)
-        test[195,6]=pdfs[0].xfxQ(0,xgrid[195],qin)
-        test[195,7]=pdfs[0].xfxQ(1,xgrid[195],qin)
-        test[195,8]=pdfs[0].xfxQ(2,xgrid[195],qin)
-        test[195,9]=pdfs[0].xfxQ(3,xgrid[195],qin)
-        test[195,10]=pdfs[0].xfxQ(4,xgrid[195],qin)
+        test[195,2]=pdfs[0].xfxQ(-4,xlast,qin)
+        test[195,3]=pdfs[0].xfxQ(-3,xlast,qin)
+        test[195,4]=pdfs[0].xfxQ(-2,xlast,qin)
+        test[195,5]=pdfs[0].xfxQ(-1,xlast,qin)
+        test[195,6]=pdfs[0].xfxQ(0,xlast,qin)
+        test[195,7]=pdfs[0].xfxQ(1,xlast,qin)
+        test[195,8]=pdfs[0].xfxQ(2,xlast,qin)
+        test[195,9]=pdfs[0].xfxQ(3,xlast,qin)
+        test[195,10]=pdfs[0].xfxQ(4,xlast,qin)
         test[195,11]=0.
         test[195,12]=0.
         test[195,13]=0.
     else:
         test[195,0]=0.
         test[195,1]=0.
-        test[195,2]=pdfs_msht(-4,pdf_pars.pdfparsi,xgrid[195])
-        test[195,3]=pdfs_msht(-3,pdf_pars.pdfparsi,xgrid[195])
-        test[195,4]=pdfs_msht(-2,pdf_pars.pdfparsi,xgrid[195])
-        test[195,5]=pdfs_msht(-1,pdf_pars.pdfparsi,xgrid[195])
-        test[195,6]=pdfs_msht(0,pdf_pars.pdfparsi,xgrid[195])
-        test[195,7]=pdfs_msht(1,pdf_pars.pdfparsi,xgrid[195])
-        test[195,8]=pdfs_msht(2,pdf_pars.pdfparsi,xgrid[195])
-        test[195,9]=pdfs_msht(3,pdf_pars.pdfparsi,xgrid[195])
-        test[195,10]=pdfs_msht(4,pdf_pars.pdfparsi,xgrid[195])
+        test[195,2]=pdfs_msht(-4,pdf_pars.pdfparsi,xlast)
+        test[195,3]=pdfs_msht(-3,pdf_pars.pdfparsi,xlast)
+        test[195,4]=pdfs_msht(-2,pdf_pars.pdfparsi,xlast)
+        test[195,5]=pdfs_msht(-1,pdf_pars.pdfparsi,xlast)
+        test[195,6]=pdfs_msht(0,pdf_pars.pdfparsi,xlast)
+        test[195,7]=pdfs_msht(1,pdf_pars.pdfparsi,xlast)
+        test[195,8]=pdfs_msht(2,pdf_pars.pdfparsi,xlast)
+        test[195,9]=pdfs_msht(3,pdf_pars.pdfparsi,xlast)
+        test[195,10]=pdfs_msht(4,pdf_pars.pdfparsi,xlast)
         test[195,11]=0.
         test[195,12]=0.
         test[195,13]=0.
