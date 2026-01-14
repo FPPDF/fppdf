@@ -259,6 +259,12 @@ def levmar_meth3(afree):
     return afout
 
 def levmar(afree):
+    """
+    Levenberg–Marquardt algorithm, takes the set of free parameters
+    and runs the minimization.
+
+    Returns the same array with the minimized parameters.
+    """
 
     lev_comb=False
     lev_update=True
@@ -300,15 +306,13 @@ def levmar(afree):
     #     lmin=1e-30
 
     
-
     hessmax=np.zeros((pdf_pars.npar_free,pdf_pars.npar_free))
     hessmaxp=np.zeros((pdf_pars.npar_free,pdf_pars.npar_free))
-
+    
+    # TODO use a context manager for this file
     outputfile=open('outputs/buffer/'+inout_pars.label+'.dat','a')
     outputfile.write("LM meth 1 ")
     outputfile.write("\n")
-
-    
     
     if del_grat:
         nsteps=35
@@ -364,7 +368,7 @@ def levmar(afree):
         
         #        lam=0.001
 
-
+        # TODO skip this condition
         if(min_pars.sgd):
             hess_calc=True      # think has to be for lev update
         else:
@@ -375,11 +379,7 @@ def levmar(afree):
         dload_pars.dcov=1
 
     
-
         (chi2i,jaci,hessi,err,hessp)=chi2min_fun(af,jac_calc,hess_calc)
-        
-        
-
 
         print('chi2i = ',chi2i)
         print('jac =',-jaci/2.)

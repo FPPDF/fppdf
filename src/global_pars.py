@@ -1,6 +1,9 @@
 import numpy as np
 from validphys.loader import Loader
 
+DEBUG = False
+# TODO: The newmin parameter should always be true
+
 class load_nnpdf:
     l=Loader()
 
@@ -112,6 +115,8 @@ class pdf_pars:
     PDFlabel_cent='init'
     # absolute path to LHAPDF directory where grids are stored
     lhapdfdir='init'
+    # path to the temporary LHAPDF files
+    tmp_lhapdfdir = None # Path
     # counter to ensure new lhapdf grid used for every new theory evaluation
     idir=0
     # if true then use lhapdf grids for theory evaluation 
@@ -998,7 +1003,7 @@ class fit_pars:
     preds_stored={}
     datapath=''
     theories_path=''
-    newmin=False
+    newmin=True # This should always be set to True
     dataset_ii_global=''
     pdf_dict=[]
 

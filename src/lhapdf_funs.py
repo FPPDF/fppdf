@@ -1,35 +1,31 @@
+from pathlib import Path
 from global_pars import *
 from pdfs import *
 import lhapdf
 import os
 import shutil as sh
 
+
 def initlha(name,lhdir):
 
     
     # dirin=pdf_pars.lhapdfdir+'NNPDF40_nnlo_pch_as_01180/'+'NNPDF40_nnlo_pch_as_01180.info'
     dirin='input/MSHT20nnlo_as118_mem1.info'
-    
-    dirlha=lhdir+name+'/'
 
-
-
-    try: 
-        os.mkdir(dirlha) 
-    except OSError as error: 
-        print(error)
+    lhdir = Path(lhdir)
+    dirlha = lhdir / name 
+    dirlha.mkdir(exist_ok = True, parents=True)
         
-    sh.copy(dirin,dirlha+name+'.info')
+    sh.copy(dirin, dirlha / f"{name}.info")
 
 def writelha(name,lhdir,parin):
+    print(f"Writing {name}")
+    # import ipdb; ipdb.set_trace()
 
-    output=lhdir+name+'/'+name+'_0000.dat'
+    lhdir = Path(lhdir)
+    output = lhdir / name / f"{name}_0000.dat"
 
-    # print(pdf_pars.parinarr[0,:])
-    # print(parin)
-
-    with open(output,'w') as outputfile:
-    
+    with output.open("w") as outputfile:
         outputfile.write('PdfType: replica')                                                   
         outputfile.write('\n')
         outputfile.write('Format: lhagrid1')
@@ -38,7 +34,7 @@ def writelha(name,lhdir,parin):
 
  #        PDFlabelmsht='MSHT20nnlo_as118'
         PDFlabelmsht='NNPDF40_nnlo_pch_as_01180'
-        inputf=pdf_pars.lhapdfdir+PDFlabelmsht+'/'+PDFlabelmsht+'_0000.dat'
+        inputf=Path(pdf_pars.lhapdfdir) / PDFlabelmsht / f"{PDFlabelmsht}_0000.dat"
         filein=open(inputf,"r")
         content=filein.readlines()
         
@@ -48,8 +44,6 @@ def writelha(name,lhdir,parin):
 #        xarr=np.loadtxt(inputf,skiprows=4,max_rows=1)
         # msht
         xarr=np.loadtxt(inputf,skiprows=3,max_rows=1)
-        
-
 
 
         nx=1000
@@ -113,11 +107,9 @@ def writelha(name,lhdir,parin):
 #        os.quit()
 
         for ix in range(0,nx):
-            
             for iq in range(0,2):
                 xin=xarr[ix]
-
-
+                # TODO: ask vp which is the starting scale for whatever theory is being used
                 if fit_pars.theoryidi==211 or fit_pars.theoryidi==40001000 or fit_pars.theoryidi==50001000:
                     qin=1.00
                 elif fit_pars.theoryidi==200:
@@ -131,7 +123,7 @@ def writelha(name,lhdir,parin):
                         pdfout=pdfs[fit_pars.lhrep].xfxQ(i,xin,qin)
                     else:
                         if iq==0:
-                            if fit_pars.newmin and chi2_pars.ipdf_newmin > 0:
+                            if chi2_pars.ipdf_newmin > 0:
                                 pdfout=pdfs_diff(i,xin)
                             else:
                                 pdfout=pdfs_msht(i,parin,xin)
@@ -145,7 +137,7 @@ def writelha(name,lhdir,parin):
                         # pdfout=pdfs[0].xfxQ(i,xin,qin)
                     else:
                         if iq==0:
-                            if fit_pars.newmin and chi2_pars.ipdf_newmin > 0:
+                            if chi2_pars.ipdf_newmin > 0:
                                 pdfout=pdfs_diff(i,xin)
                             else:
                                 pdfout=pdfs_msht(i,parin,xin)
@@ -157,7 +149,7 @@ def writelha(name,lhdir,parin):
                     pdfout=pdfs[fit_pars.lhrep].xfxQ(21,xin,qin)
                 else:
                     if iq==0:
-                        if fit_pars.newmin and chi2_pars.ipdf_newmin > 0:
+                        if chi2_pars.ipdf_newmin > 0:
                             pdfout=pdfs_diff(0,xin)
                         else:
                             pdfout=pdfs_msht(0,parin,xin)
@@ -165,7 +157,6 @@ def writelha(name,lhdir,parin):
                         pdfout=1.
                 pdfarr[5]=pdfout
             
-#                np.savetxt(outputfile,pdfarr,fmt="%.7E",delimiter=' ', newline=' ')
                 np.savetxt(outputfile,pdfarr,fmt="%.14E",delimiter=' ', newline=' ')
                 outputfile.write('\n')
 
@@ -265,7 +256,3 @@ def writelha_end(name,lhdir,parin):
                 outputfile.write('\n')
 
         outputfile.write('---')
-
-def dellha(name):
-    dirlha=pdf_pars.lhapdfdir+name+'/'
-    sh.rmtree(dirlha)

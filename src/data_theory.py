@@ -14,7 +14,7 @@ from validphys.fkparser import load_fktable
 from validphys.kinematics import *
 import operator
 import lhapdf
-from validphys.commondataparser import load_commondata
+from nnpdf_data.commondataparser import load_commondata
 from validphys.convolution import OP
 import functools
 from validphys.pdfbases import evolution
@@ -73,18 +73,20 @@ def del_pen_calc():
 
     return (chi0d,chi0u,diffd,diffu,hessd,hessu,idv,iuv)
 
-def pos_calc(pdata):
+def pos_calc(pdata, vp_pdf=None):
 
     tot=0.
     totdiff=0.
+    if vp_pdf is None:
+        vp_pdf = pdf_pars.PDFlabel
 
     
     for j in range(0,len(pdata)):
     
         if fit_pars.theoryidi==40001000 or fit_pars.theoryidi==50001000:            
-            api_predictions = API.positivity_predictions_data_result(theoryid=fit_pars.theoryidi, pdf=pdf_pars.PDFlabel, posdataset=pdata[j],use_cuts="internal")
+            api_predictions = API.positivity_predictions_data_result(theoryid=fit_pars.theoryidi, pdf=vp_pdf, posdataset=pdata[j],use_cuts="internal")
         else:
-            api_predictions = API.positivity_predictions_data_result(theoryid=fit_pars.theoryidi, pdf=pdf_pars.PDFlabel, posdataset=pdata[j])
+            api_predictions = API.positivity_predictions_data_result(theoryid=fit_pars.theoryidi, pdf=vp_pdf, posdataset=pdata[j])
         out=api_predictions.central_value
 
         # print(pdata[j])
@@ -203,6 +205,9 @@ def _predictions_2pdfs_new(dataset, fkfunc, pdf1, pdf2=None):
     all replicas, central, etc) according to the provided ``fkfunc``, which
     should have the same interface as e.g. ``fk_predictions``.
     """
+    if not DEBUG:
+        print("We should not be entering here! Who's calling me?")
+        raise Exception
     
     opfunc = OP[dataset.op]
     if dataset.cuts is None:

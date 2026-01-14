@@ -1,7 +1,6 @@
 from global_pars import *
 import numpy as np
-
-
+from outputs import BUFFER_F
 
 def readincov():
 
@@ -56,14 +55,17 @@ def readincov():
     return (afin,hess,jac)
 
 def readin():
+    """Read the input file inputs::input_file
+
+    Uses ``np.loadtxt`` to read the file a few times once per flavour.
+    These parameters are the initial parameters of the fit.
+    For each set of parameters, the first column represents the parameter value
+    and the second whether it is a free parameter (1) or whether it should be considered fixed (0)
+    """
 
     parfree_def=False
 
     inputfile='input/'+inout_pars.inputnam
-
-    with open(inputfile, 'r') as fp:
-        x = fp.readlines()
-        num_lines = len([l for l in x if l.strip(' \n') != ''])
 
     # distuv=np.loadtxt(inputfile,skiprows=1,max_rows=8)
     nuv=basis_pars.i_uv_max-basis_pars.i_uv_min-1
@@ -181,8 +183,7 @@ def readin():
     afin=np.delete(afin,0)
     pdf_pars.par_free_i=np.delete(pdf_pars.par_free_i,0)
     
-
-    outputfile=open('outputs/buffer/'+inout_pars.label+'.dat','w')
+    outputfile = (BUFFER_F / f"{inout_pars.label}.dat").open("w")
     outputfile.write("Starting new buffer...")
     outputfile.write("\n")
 

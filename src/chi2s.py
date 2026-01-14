@@ -1,9 +1,14 @@
 from global_pars import *
+import functools
 from validphys.api import API
 import scipy.linalg as la
 from data_theory import *
 from validphys.calcutils import calc_chi2
 from validphys.covmats import dataset_inputs_t0_covmat_from_systematics, dataset_inputs_covmat_from_systematics
+
+from validphys.api import API
+from validphys.convolution import central_predictions
+
 from pdfs import *
 from inputs import *
 from lhapdf_funs import *
@@ -71,17 +76,15 @@ def af_matcalc(afree):
 
     return afree_mat
 
-def chi2min_fun(afree,jac_calc,hess_calc):
-
-
+def chi2min_fun(afree, jac_calc = False, hess_calc = False, vp_pdf=None):
+    """
+        Compute the chi2 for a MSHTPDF for the parameters arfree.
+        If jac_calc is True <to be completed>
+    """
     err=False
-    
     parin=initpars()
-
     pdfparsii=parset(afree,parin)
-
     dload_pars.xarr_tot=xgrid_calc()
-
 #    print('pdfparsi = ',pdfparsi)
     
     if not jac_calc and not hess_calc:
@@ -95,6 +98,15 @@ def chi2min_fun(afree,jac_calc,hess_calc):
 
     pdf_pars.pdfparsi=sumrules(pdfparsii)
 
+    # Reset the vp_pdf if not explicitly given
+    if vp_pdf is None:
+        parin = initpars()
+        pdf_parameters_raw = parset(afree, parin, are_free = pdf_pars.par_isf)
+        pdf_parameters = sumrules(pdf_parameters_raw)
+        vp_pdf = MSHTPDF(name = "pdf", pdf_parameters = pdf_parameters, pdf_function = "msht")
+
+    # TODO Perhaps at this point we want to update the parameters in vp_pdf or to create a new one?
+    # note that upon first call at this point the parameters in pdfparsii are equal to those in the PDF
 
     if fit_pars.deld_const:
         pdf_pars.deld_arr=np.zeros((4*pdf_pars.npar_free+1))
@@ -103,9 +115,6 @@ def chi2min_fun(afree,jac_calc,hess_calc):
         pdf_pars.delu_arr[0]=pdf_pars.pdfparsi[1]
 
     # print(pdf_pars.pdfparsi[10])
-
-    
-
     jac=np.zeros((pdf_pars.npar_free))
     hess=np.zeros((pdf_pars.npar_free,pdf_pars.npar_free))
     hessp=np.zeros((pdf_pars.npar_free,pdf_pars.npar_free))
@@ -119,11 +128,13 @@ def chi2min_fun(afree,jac_calc,hess_calc):
         pdflabel_p2arr=np.empty(pdf_pars.npar_free+1, dtype='U256')
 
     if(jac_calc):
-
         eps_arr=np.zeros((pdf_pars.npar_free+1))
         chi2_pars.eps_arr_newmin=eps_arr
-        for ip in range(0,pdf_pars.npar_free+1):
 
+        # TODO
+        # this loop creates the LHAPDF grids for each free parameter
+        pdf_pars.derivatives =[]
+        for ip in range(0,pdf_pars.npar_free+1):
             idir_j=pdf_pars.idir+ip
             name=inout_pars.label+'_run'+str(idir_j)
             # name=inout_pars.label+'_irep'+str(fit_pars.irep)+'_run'+str(idir_j)
@@ -135,24 +146,28 @@ def chi2min_fun(afree,jac_calc,hess_calc):
                 pdf_pars.PDFlabel_cent=name
             else:
                 parin=pdf_pars.pdfparsi.copy() 
-                if fit_pars.newmin:
-                    (parin1,eps_arr[ip])=parinc(parin,ip-1,1)
-                    chi2_pars.eps_arr_newmin[ip]=eps_arr[ip]
-                else:   
-                    (parin1,eps_arr[ip])=parinc(parin,ip-1,1)
+                (parin1,eps_arr[ip])=parinc(parin,ip-1,1)
+                chi2_pars.eps_arr_newmin[ip]=eps_arr[ip]
                 pdf_pars.parinarr[ip,:]=parin1
 
                 if fit_pars.deld_const:
                     pdf_pars.deld_arr[ip]=parin1[10]
                     pdf_pars.delu_arr[ip]=parin1[1]
                 
-                
             if(pdf_pars.uselha):
+                # TODO what about this
                 chi2_pars.ipdf_newmin=ip
-                initlha(name,pdf_pars.lhapdfdir)
+                if ip > 0:
+                    parameter_index = pdf_pars.par_free_i[ip - 1]
+                    pdf_derivative = vp_pdf.make_derivative(parameter_index)
+                    pdf_pars.derivatives.append(pdf_derivative)
+                if DEBUG:
+                    initlha(name,pdf_pars.lhapdfdir)
+                    writelha(name,pdf_pars.lhapdfdir,parin1)
+                
                 pdf_pars.PDFlabel=name
                 pdf_pars.parin_newmin_reset=True
-                writelha(name,pdf_pars.lhapdfdir,parin1)
+        #######################
 
 
         if chi2_pars.diff_2 or fit_pars.pos_const:
@@ -175,22 +190,20 @@ def chi2min_fun(afree,jac_calc,hess_calc):
                     pdf_pars.delu_arr[pdf_pars.npar_free+ip]=parin1[1]
 
                 if(pdf_pars.uselha):
-                    
+                    # TODO what about this 2
                     initlha(name,pdf_pars.lhapdfdir)
                     pdf_pars.PDFlabel=name
+                    print("Here 2")
                     writelha(name,pdf_pars.lhapdfdir,parin1) 
 
-        if chi2_pars.diff_2:        
+        if chi2_pars.diff_2: 
+            # TODO: vp_pdf should go through here as well
             (out0,out1,jac,hessd2)=jaccalc_d2(pdflabel_arr,pdflabel_marr,eps_arr,hess_calc,fit_pars.imindat,fit_pars.imaxdat)
             out=out0+out1
             hess=hessd2.copy()
-
         else:
             print('JACCALC')
-            if fit_pars.newmin:
-                (jac,hess,out0,out1,hessp)=jaccalc_newmin(pdflabel_arr,pdflabel_marr,eps_arr,hess_calc)
-            else:
-                (jac,hess,out0,out1,hessp)=jaccalc(pdflabel_arr,pdflabel_marr,eps_arr,hess_calc)
+            (jac,hess,out0,out1,hessp)=jaccalc_newmin(pdflabel_arr,pdflabel_marr,eps_arr,hess_calc, vp_pdf=vp_pdf)
             out=out0+out1
             
 
@@ -199,7 +212,6 @@ def chi2min_fun(afree,jac_calc,hess_calc):
                 idir_j=pdf_pars.idir+ip
                 name=inout_pars.label+'_run'+str(idir_j)
                 # name=inout_pars.label+'_irep'+str(fit_pars.irep)+'_run'+str(idir_j)
-                dellha(name)
                 
             pdf_pars.idir+=pdf_pars.npar_free+1
 
@@ -209,40 +221,41 @@ def chi2min_fun(afree,jac_calc,hess_calc):
                     idir_j=pdf_pars.idir+ip
                     name=inout_pars.label+'_run'+str(idir_j)
                     # name=inout_pars.label+'_irep'+str(fit_pars.irep)+'_run'+str(idir_j)
-                    dellha(name)
 
                 pdf_pars.idir+=pdf_pars.npar_free
         
     else:
+        if DEBUG:
+            # TODO: to be removed 
+            # when computing the chi2 no need to do anything with the PDF
 
-        name=inout_pars.label+'_run'+str(pdf_pars.idir) 
-        # name=inout_pars.label+'_irep'+str(fit_pars.irep)+'_run'+str(pdf_pars.idir)
+            name=inout_pars.label+'_run'+str(pdf_pars.idir) 
+            parin1=pdf_pars.pdfparsi.copy() 
 
+            pdf_pars.parinarr[0,:]=parin1
+            pdf_pars.iPDF=0
 
-        parin1=pdf_pars.pdfparsi.copy() 
+            # write to temp lhapdf grid to be used by nnpdf code
+            if(pdf_pars.uselha):
+                # TODO: this might not be needed at all
+                # in any case here writelha uses always msht
+                chi2_pars.ipdf_newmin=0
 
-        pdf_pars.parinarr[0,:]=parin1
-        pdf_pars.iPDF=0
+                initlha(name, pdf_pars.tmp_lhapdfdir)
+                pdf_pars.PDFlabel=name
+                writelha(name,pdf_pars.tmp_lhapdfdir,parin1)
 
-        # write to temp lhapdf grid to be used by nnpdf code
-        if(pdf_pars.uselha):
-            initlha(name,pdf_pars.lhapdfdir)
-            pdf_pars.PDFlabel=name
-            chi2_pars.ipdf_newmin=0
-            writelha(name,pdf_pars.lhapdfdir,parin1)    
-        # calculate chi2
-        chi=chi2totcalc()
+        print("> Calculating chi2 <")
+        chi=chi2totcalc(vp_pdf=vp_pdf)
         out=chi[0]+chi[1] # exp + positivity
         out0=chi[0]
-        if(pdf_pars.uselha):
-            dellha(name) # delete temporary folder
         pdf_pars.idir+=1 # iterate up so new folder
 
-        print('chi2/N_dat=',out/chi2_pars.ndat)                                                                                             
-        print('chi2tot (no pos)=',out0)                                                                                       
-        print('pos pen =',chi[1])
-        print('chi2tot (no pos)/N_dat=',out0/chi2_pars.ndat)  
-        
+        ndat = chi2_pars.ndat
+        print(f"chi2/N_dat={out/ndat:.5}")
+        print(f"chi2tot (no pos)={out0:.5}")
+        print(f"pos pen ={chi[1]:.5}")
+        print(f"chi2tot (no pos)/N_dat={out0/ndat:.5}")  
 
     # if jac_calc and hess_calc:
     #     print('testing...')
@@ -259,13 +272,14 @@ def chi2min_fun(afree,jac_calc,hess_calc):
 
     return(out,jac,hess,err,hessp)
 
-def chi2corr(imin,imax):
-
+def chi2corr(imin, imax, vp_pdf=None, theta_idx=None):
+    # TODO: add docstr
+    """ """
     if(pdf_closure.pdpdf):
         (out,theorytot,cov,covin)=chi2corr_pdf()
         diffs_out=0.
     else:
-        (out,theorytot,cov,covin,diffs_out)=chi2corr_global(imin,imax)
+        (out,theorytot,cov,covin,diffs_out)=chi2corr_global(imin, imax, vp_pdf, theta_idx=theta_idx)
 
     return (out,theorytot,cov,covin,diffs_out)
     
@@ -660,8 +674,11 @@ def chi2corr_ind(i):
 
     return (out,ndat,dlabel)
 
-def chi2corr_global(imin,imax):
-
+def chi2corr_global(imin, imax, vp_pdf=None, theta_idx=None):
+    """Compute chi2 for the global dataset.
+    Takes from index 0 of the dataset all the way to index imax
+    as defined in ``global_pars.fit_pars.dataset_40``.
+    """
 
     if fit_pars.nlo_cuts:
         # intersection=[{"dataset_inputs": dload_pars.dscomb, "theoryid": 212}]
@@ -729,15 +746,23 @@ def chi2corr_global(imin,imax):
 
     # outputfile_label=open('outputs/pseudodata/datalabels.dat','w')
 
+    # TODO: in principle this entire loop could be replaced by a direct call to calc_chi2 with the following input
+    # 1. covmat -> needs information on t0 (on/off), datasets, cuts
+    # 2. data -> needs datasets, cuts, replica seed (if needed)
+    # 3. theory results -> data, cuts, theory
+    # if the replicas were prepared beforehand that would speed up things though
+
+    vp_input = {"use_cuts": "internal", "theoryid": fit_pars.theoryidi}
+    if vp_pdf is not None:
+        vp_input["pdf"] = vp_pdf
+    all_ds_input = []
+
     for i in range(imin,imax+1):
         dataset_testii=fit_pars.dataset_40[i]  
-        
-        # print(fit_pars.dataset_40[i])
-        inptt = {                                                                                                                 
-                "dataset_input": dataset_testii,                                                                                      
-                "use_cuts": "internal",                                                                                               
-                "theoryid": fit_pars.theoryidi,                                                                         
-            }      
+
+        inptt = {**vp_input, "dataset_input": dataset_testii}
+        all_ds_input.append(dataset_testii)
+
         # if fit_pars.nlo_cuts:
         #     # inptt = {                          
         #     #     "cuts_intersection_spec": [{"theoryid": 212, "theoryid": 211}],                                                                                      
@@ -759,8 +784,17 @@ def chi2corr_global(imin,imax):
         #         "use_cuts": "internal",                                                                                               
         #         "theoryid": fit_pars.theoryidi,                                                                         
         #     }    
-               
-        theory=theory_calc(i,dataset_testii,inptt,fit_pars.cftrue[i])
+        
+        if vp_pdf is not None and theta_idx is not None:
+            # computing derivative of th prediction wrt free parameter theta_idx
+            theory = vp_pdf.derivative_th_predictions("internal", fit_pars.theoryidi, dataset_testii, theta_idx)
+        elif vp_pdf is not None:
+            # computing central value of th prediction.
+            # In order to use this aslo to compute the derivative we need to modify vp API allowing central_predictions to take 2 pdfs as input
+            theory = API.central_predictions(**inptt).values[:,0]
+        else:
+            theory=theory_calc(i,dataset_testii,inptt,fit_pars.cftrue[i])
+
         fit_pars.preds_stored[str(dataset_testii["dataset"])]=theory
 
         # for j in range (0,len(theory)):
@@ -827,8 +861,41 @@ def chi2corr_global(imin,imax):
     # print(len(theorytot))
     # exit()
 
+    if vp_pdf is not None:
+        # Get the covmat for all the dataset we have calculated chi2 for. The order is the same as the vector of theories
+        # TODO: eventually we'll try to skip it and compute the chi2 directly
+        # TODO: in principle nlo intersenction cut should already be part of vp_input at this stage
+        cov = API.dataset_inputs_covmat_t0_considered(**vp_input, dataset_inputs = all_ds_input, use_t0=chi2_pars.t0, t0pdfset=vp_pdf)
+        covin = la.inv(cov)
 
-    if(chi2_pars.t0):
+        if chi2_pars.t0:
+            dload_pars.covt0=cov
+            dload_pars.covt0_inv=covin
+            dload_pars.dcov=0
+            # LHL ADDED NEW - so that t0 def is used in minimisation
+        elif chi2_pars.t0_noderiv: 
+            if dload_pars.dcov==1:
+                try:
+                    # cov = API.dataset_inputs_t0_covmat_from_systematics(**inpt0)
+                    cov = API.dataset_inputs_covmat_t0_considered(**vp_input, dataset_inputs = all_ds_input, use_t0=True, t0pdfset=vp_pdf)
+                    covin=la.inv(cov)
+                except (la.LinAlgError,ValueError) as err:
+                    print('t0 cov may be ill behaved, trying exp cov instead...')
+                    cov=dload_pars.covexp
+                    covin=dload_pars.covexp_inv
+                print('t0 cov2...')
+                # cov = API.dataset_inputs_covmat_t0_considered(**vp_input, dataset_inputs = all_ds_input, use_t0=True, t0pdfset=vp_pdf)
+                # # print(cov)
+                # covin = la.inv(cov)
+                dload_pars.covt0=cov
+                dload_pars.covt0_inv=covin
+                print('...finish')    
+                dload_pars.dcov=0
+        else:
+            dload_pars.covexp=cov
+            dload_pars.covexp_inv=covin
+
+    elif(chi2_pars.t0):
         print('t0 cov1...')
         if fit_pars.nlo_cuts:
             inpt0 = dict(dataset_inputs=dload_pars.dscomb, theoryid=fit_pars.theoryidi, use_cuts="fromintersection", cuts_intersection_spec=intersection, t0pdfset=pdf_pars.PDFlabel, use_t0=True)
@@ -1160,12 +1227,14 @@ def jac_fun(afree):
     print('Jacobian = ',out)
     return out
 
-def chi2min(afree):
-
-
+def chi2min(afree = None, vp_pdf=None):
+    """Compute the chi2 that will be used during the minimization
+    But disable the computation of the hessian and jacobian.
+    Takes as input the free parameters of the problem.
+    """
     hess_calc=False
     jac_calc=False
-    outarr=chi2min_fun(afree,jac_calc,hess_calc)
+    outarr=chi2min_fun(afree,jac_calc,hess_calc, vp_pdf=vp_pdf)
     out=outarr[0]
     return out
     
@@ -1246,11 +1315,13 @@ def chilim_fill(nd,chi,dlab):
     chi2_pars.chi0_ind_arr.append(chi)
     # print(i,chilim/chi,cl68,cl50,cl68/cl50,nd)
 
-def chi2totcalc():
+def chi2totcalc(vp_pdf=None):
+    """If a VP pdf is used, use VP to compute the chi2"""
 
-    
-    chiarr=np.zeros(fit_pars.imaxdat-fit_pars.imindat)
-    chiarr[0]=chi2corr(fit_pars.imindat,fit_pars.imaxdat-1)[0]
+    # Prepare an array to save the chi2 for each dataset
+    chiarr = np.zeros(fit_pars.imaxdat - fit_pars.imindat)
+
+    chiarr[0] = chi2corr(fit_pars.imindat, fit_pars.imaxdat - 1, vp_pdf=vp_pdf)[0]
 
     ndtot=0
     chi2totind=0.
@@ -1367,9 +1438,10 @@ def chi2totcalc():
 
     out1=0.
     if fit_pars.pos_const:
-        out31=pos_calc(fit_pars.pos_data31)
+
+        out31=pos_calc(fit_pars.pos_data31, vp_pdf=vp_pdf)
         if(fit_pars.pos_40):
-            out40=pos_calc(fit_pars.pos_data40)
+            out40=pos_calc(fit_pars.pos_data40, vp_pdf=vp_pdf)
             chi2pos=out31+out40
             out1=chi2pos
         else:
@@ -1429,6 +1501,7 @@ def hess_ij_calc_not0_new(theoryi,theoryj,outi,outj,cov,covin):
     return out
 
 def hess_ij_calc_newmin(diffi,diffj,covin):
+    """Compute off-diagonal entries of the hessian"""
 
     out=diffi@covin@diffj*2.
 
@@ -1562,6 +1635,7 @@ def hess_ii_calc_d2(diff2,cov,covin):
     return out
 
 def hess_ii_calc_newmin(diff2,cov,covin):
+    """Compute diagonal entries of the hessian"""
 
   
 
@@ -1815,7 +1889,10 @@ def jaccalc_d0(label_arr,eps_arr,il,ih):
 
     return jacarr
 
-def jaccalc_newmin(label_arr,label_arrm,eps_arr,hess_calc):
+def jaccalc_newmin(label_arr,label_arrm,eps_arr,hess_calc, vp_pdf=None):
+    """Compute the derivative of the chi2 wrt the free parameters 
+    (given in Eq.6 https://people.duke.edu/~hpgavin/lm.pdf) and the Hessian 
+    (given after Eq.9 https://people.duke.edu/~hpgavin/lm.pdf)"""
 
     print('JACCALC NEWMIN')
 
@@ -1827,7 +1904,9 @@ def jaccalc_newmin(label_arr,label_arrm,eps_arr,hess_calc):
 
     pdf_pars.PDFlabel=label_arr[0].strip()
     pdf_pars.iPDF=0
-    (chiarr[0],theory0,cov0,cov0in,diffs0)=chi2corr(fit_pars.imindat,imax-1)
+
+    # compute chi2, theory predictions, cov, cov_inv, and theory - data
+    (chiarr[0],theory0,cov0,cov0in,diffs0)=chi2corr(fit_pars.imindat,imax-1,vp_pdf)
     
     tarr=[theory0]
     covarr=[cov0]
@@ -1841,7 +1920,15 @@ def jaccalc_newmin(label_arr,label_arrm,eps_arr,hess_calc):
         # print(ip)
         pdf_pars.iPDF=ip
         pdf_pars.PDFlabel=label_arr[ip].strip()
-        (chiarr[ip],theory,cov,covin,diffs_out)=chi2corr(fit_pars.imindat,imax-1)
+
+        parameter_index = pdf_pars.par_free_i[ip - 1]
+
+        # compute derivative of the PDF wrt the free parameter parameter_index
+        pdf_derivative = vp_pdf.make_derivative(parameter_index)
+        
+        # compute J_i, i.e. the derivative of the theory predictions wrt the free parameter i=parameter_index (theory)
+        # NB: for the time being vp_pdf=vp_pdf, but if using API.central_predictions to compute derivative then it should be vp_pdf=pdf_derivative
+        (chiarr[ip],theory,cov,covin,diffs_out)=chi2corr(fit_pars.imindat,imax-1, vp_pdf=vp_pdf, theta_idx=parameter_index)
         tarr.append(theory)
         diffsarr.append(diffs_out)
         if(chi2_pars.uset0cov):
@@ -1860,12 +1947,16 @@ def jaccalc_newmin(label_arr,label_arrm,eps_arr,hess_calc):
         
 
         # print(tarr[ip])
-        test1=-2.*tarr[ip]@cov0in@diffsarr[0]
+
+        # compute the derivative of the chi2 wrt the free parameter parameter_index
+        # Eq.6 https://people.duke.edu/~hpgavin/lm.pdf
+        test1=-2.*tarr[ip]@cov0in@diffsarr[0] 
         jacarr[ip]=test1
         # print(np.sum(tarr[ip]))
 
 
         if(hess_calc):
+            # compute the diagonal entries of the hessian, defined as J cov0in J^T
             if ip==1:
                 tii0=hess_ii_calc_newmin(tarr[ip],cov0,cov0in)
                 print(tii0)
@@ -1873,12 +1964,14 @@ def jaccalc_newmin(label_arr,label_arrm,eps_arr,hess_calc):
             else:
                 tii0=hess_ii_calc_newmin(tarr[ip],cov0,cov0in)
                 tii.append(tii0)
-                    
+        # I guess this should also happen only if(hess_calc)?         
         for jp in range(1,ip+1):
             if ip==jp:
+                # fill the diagonal
                 hii=tii[ip-1]
                 hessarr[ip,jp]=hii
             else:
+                # compute the off-diagonal entries of the hessian (lower-triangular entries)
                 hij=hess_ij_calc_newmin(tarr[ip],tarr[jp],cov0in)
                 hessarr[ip,jp]=hij
     
@@ -1886,8 +1979,10 @@ def jaccalc_newmin(label_arr,label_arrm,eps_arr,hess_calc):
 
     hessarr=np.delete(hessarr,0,0)
     hessarr=np.delete(hessarr,0,1)
+    # compute the missing entries of the hessian using the fact that it s symmetric
     hessarr=hessarr+hessarr.T-np.diag(hessarr.diagonal()) 
     
+    # save the chi2
     out0=chiarr[0]
     
     chiarr=np.zeros((pdf_pars.npar_free+1))
@@ -1895,6 +1990,7 @@ def jaccalc_newmin(label_arr,label_arrm,eps_arr,hess_calc):
     penarr=np.zeros((pdf_pars.npar_free+1))
 
     if fit_pars.pos_const:
+        # what about this?
         for ip in range(0,pdf_pars.npar_free+1):
             pdf_pars.PDFlabel=label_arr[ip].strip()
             out31=pos_calc(fit_pars.pos_data31)
@@ -1907,6 +2003,7 @@ def jaccalc_newmin(label_arr,label_arrm,eps_arr,hess_calc):
             chiarr[ip]=chiarr[ip]+out1
 
     if fit_pars.pos_const:
+        # what about this?
         for ip in range(1,pdf_pars.npar_free+1):
             pdf_pars.PDFlabel=label_arrm[ip].strip()
             out31m=pos_calc(fit_pars.pos_data31)            
@@ -1938,7 +2035,8 @@ def jaccalc_newmin(label_arr,label_arrm,eps_arr,hess_calc):
 
     return(jacarr,hessarr,out0,out1,hessparr)
 
-def jaccalc(label_arr,label_arrm,eps_arr,hess_calc):
+def jaccalc(label_arr,label_arrm,eps_arr,hess_calc, vp_pdf=None):
+    # TODO
 
     print('JACCALC OLDMIN')
 
@@ -1950,7 +2048,7 @@ def jaccalc(label_arr,label_arrm,eps_arr,hess_calc):
 
     pdf_pars.PDFlabel=label_arr[0].strip()
     pdf_pars.iPDF=0
-    (chiarr[0],theory0,cov0,cov0in,diffs_out)=chi2corr(fit_pars.imindat,imax-1)
+    (chiarr[0],theory0,cov0,cov0in,diffs_out)=chi2corr(fit_pars.imindat,imax-1,vp_pdf)
     
     tarr=[theory0]
     covarr=[cov0]
@@ -1963,7 +2061,7 @@ def jaccalc(label_arr,label_arrm,eps_arr,hess_calc):
         # print(ip)
         pdf_pars.iPDF=ip
         pdf_pars.PDFlabel=label_arr[ip].strip()
-        (chiarr[ip],theory,cov,covin,diffs_out)=chi2corr(fit_pars.imindat,imax-1)
+        (chiarr[ip],theory,cov,covin,diffs_out)=chi2corr(fit_pars.imindat,imax-1,vp_pdf)
         tarr.append(theory)
         if(chi2_pars.uset0cov):
             covarr.append(cov)
@@ -2024,7 +2122,7 @@ def jaccalc(label_arr,label_arrm,eps_arr,hess_calc):
 
     hessarr=np.delete(hessarr,0,0)
     hessarr=np.delete(hessarr,0,1)
-    hessarr=hessarr+hessarr.T-np.diag(hessarr.diagonal()) 
+    hessarr=hessarr+hessarr.T-np.diag(hessarr.diagonal()) # hessian is symmetric, so fill the remaining entries
     
     out0=chiarr[0]
     

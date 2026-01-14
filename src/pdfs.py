@@ -1,11 +1,188 @@
+import functools
 from global_pars import *
 from chebyshevs import *
+from copy import deepcopy
 import numpy as np
-import os
-from scipy.integrate import quadrature
-from scipy.misc import derivative as deriv
+try:
+    from scipy.integrate import quadrature
+    from scipy.misc import derivative as deriv
+except ImportError:
+    from scipy.integrate import quad as quadrature
+    from scipy.differentiate import derivative as deriv
 
-def func_pdfs_diff(eps,ipdf,x,iorder):
+from validphys.core import PDF
+from validphys.lhapdfset import LHAPDFSet
+from validphys.api import API
+
+def _derivative(func, fl, parameters, x, eps):
+    """The scipy.misc.derivative function is deprecated and won't exist in newer versions
+    of scipy.
+    This implements the same derivative for order 5, evaluated at 0
+    already specialized for the PDF functions which take only the variation as input
+    From: https://github.com/scipy/scipy/blob/92d2a8592782ee19a1161d0bf3fc2241ba78bb63/scipy/_lib/_finite_differences.py#L69
+    """
+    # TODO: we can probably have the exact derivative and that's it?
+    weights = np.array([1, -8, 8, -1]) / 12.0
+    funvals = np.array([func(fl, p, x) for p in parameters])
+    return np.sum(funvals * weights) / np.sum(eps)
+
+def _derivative_th_prediction(func, use_cuts, theoryid, dataset_input, parameters, eps):
+    """As _derivative but specialized for the th_predictions function"""
+    weights = np.array([1, -8, 8, -1]) / 12.0
+    funvals = np.array([func(use_cuts, theoryid, dataset_input, p) for p in parameters])
+    return np.sum(funvals * weights[:,np.newaxis],axis=0) / np.sum(eps)
+
+
+class MSHTSet(LHAPDFSet):
+    """Provides a few lhapdf-like functions to trick vp into thinking it is an LHAPDFset
+    Can work with any function with a signature of (flavour, parameters, x)
+    """
+
+    def __init__(
+        self,
+        pdf_function,
+        parameters,
+        name,
+        error_type="replicas",
+        variation=None,
+        theta_idx=None,
+    ):
+        self._error_type = error_type
+        self._name = name
+        self._flavors = None
+        self._lhapdf_set = [None]
+
+        self._parameters = parameters
+        self._pdf_function = pdf_function
+        self._derivatives = []
+        self._variation = variation
+
+        if variation is not None:
+            # Compute the 4 variations needed for the derivative
+            for k in [-2, -1, 1, 2]:
+                self._derivatives.append(
+                    parinc_newmin(
+                        self._parameters, theta_idx, k * variation, true_idx=True
+                    )[0]
+                )
+
+    @functools.cached_property
+    def is_derivative(self):
+        """Whether this is a PDF of its derivative"""
+        return self._variation is not None
+
+    def xfxQ(self, x, Q, n, fl):
+        """Return the PDF value for one single point for one single member
+        Note that in this case both scale (Q) and member (n) are ignored.
+        """
+        if fl == 21:
+            fl = 0
+        if self.is_derivative:
+            return _derivative(
+                self._pdf_function, fl, self._derivatives, x, self._variation
+            )
+        else:
+            return self._pdf_function(fl, self._parameters, x)
+
+    def grid_values(self, flavors: np.ndarray, xgrid: np.ndarray, qgrid: np.ndarray):
+        """Returns the PDF values for every member for the required flavors, x, q
+
+        For the time being assume there is only one Q and only one member
+        Return shape: (members, flavours, xgrid, qgrid)
+        """
+        out_ret = []
+        for fl in flavors:
+            tmp = []
+            for x in xgrid:
+                tmp.append(self.xfxQ(x, None, None, fl))
+            out_ret.append(tmp)
+        return np.array(out_ret).reshape(1, len(flavors), -1, 1)
+
+
+class MSHTPDF(PDF):
+    """
+    Creates a MSHT PDF object, extends validphys' PDF object
+    to utilize a MSHT set in the background instead of lhapdf / pdfflow
+    """
+
+    def __init__(
+        self,
+        name="msht",
+        boundary=None,
+        pdf_function="msht",
+        pdf_parameters=None,
+        variation=None,
+        theta_idx=None,
+        Q=1.0,
+    ):
+        if isinstance(pdf_function, str):
+            if pdf_function != "msht":
+                raise NotImplementedError(f"{pdf_function=}")
+            pdf_function = pdfs_msht
+
+        self._pdf_function = pdf_function
+        self._pdf_parameters = pdf_parameters
+        self._variation = variation
+        self._theta_idx = theta_idx
+
+        # Add a hash of the parameter to the name to make them unique and update cached quantities
+        name = f"{name}_{hash(pdf_parameters.tostring())}"
+        super().__init__(name, None)
+
+        # Create some fake info:
+        self._info = {"NumMembers": 1}
+
+    @functools.cached_property
+    def _lhapdf_set(self):
+        return MSHTSet(
+            self._pdf_function,
+            self._pdf_parameters,
+            self.name,
+            variation=self._variation,
+            theta_idx=self._theta_idx
+        )
+
+    def make_derivative(self, idx, eps=1e-5):
+        """Constructs the derivative of the PDF with respect the parameter idx."""
+        variation = np.maximum(1e-12, eps * np.abs(self._pdf_parameters[idx]))
+        return self.__class__(
+            "derivative",
+            pdf_function=self._pdf_function,
+            pdf_parameters=self._pdf_parameters,
+            variation=variation,
+            theta_idx=idx,
+        )
+
+    def load(self):
+        return self._lhapdf_set
+
+    def load_t0(self):
+        t0_version = deepcopy(self._lhapdf_set)
+        t0_version._error_type = "t0"
+        return t0_version
+
+    def th_predictions(self, use_cuts, theoryid, dataset_input, parameters):
+        """Compute theory predictions given the PDF"""
+        pdf = self.__class__(
+            pdf_function=self._pdf_function,
+            pdf_parameters=parameters
+        )
+        return API.central_predictions(use_cuts=use_cuts, theoryid=theoryid, pdf=pdf, dataset_input=dataset_input).values[:,0]
+
+    def derivative_th_predictions(self, use_cuts, theoryid, dataset_input, theta_idx):
+        """Compute the derivative of the theory predictions wrt the free parameter theta_idx"""
+        derivatives = []
+        variation = np.maximum(1e-12, 1e-5 * np.abs(self._pdf_parameters[theta_idx]))
+        # Compute the 4 variations needed for the derivative
+        for k in [-2, -1, 1, 2]:
+            derivatives.append(
+                parinc_newmin(
+                    self._pdf_parameters, theta_idx, k * variation, true_idx=True
+                )[0]
+            )
+        return _derivative_th_prediction(self.th_predictions, use_cuts, theoryid, dataset_input, derivatives, variation)
+
+def func_pdfs_diff(eps,ipdf=1,x=0.0,iorder=5):
 
     # print(eps)
 
@@ -25,35 +202,32 @@ def func_pdfs_diff(eps,ipdf,x,iorder):
 
     return out
 
-def pdfs_diff(ipdf,x):
-
+def pdfs_diff(ipdf, x=None, parin=None):
     eps=1e-5
     # (pars,eps_out)=parinc_newmin(pdf_pars.parinarr[0,:],chi2_pars.ipdf_newmin-1,eps)
+
     eps=parinc_eps(pdf_pars.parinarr[0,:],chi2_pars.ipdf_newmin-1,eps)
-
-    # # pdfout=pdfs_msht(ipdf,pars,x)-pdfs_msht(ipdf,pdf_pars.parinarr[0,:],x)
-    # pdfout=func_pdfs_diff(eps,ipdf,x)-func_pdfs_diff(0.,ipdf,x)
-    # # pdfout/=chi2_pars.eps_arr_newmin[chi2_pars.ipdf_newmin]
-    # pdfout/=eps
-
-    # derivative(func, x0, dx=1.0
 
     pdf_pars.parin_newmin_counter=0
     iorder=5
     pdfout=deriv(func_pdfs_diff,0.,eps,args=(ipdf,x,iorder),order=iorder)
+
+#     test = functools.partial(func_pdfs_diff, x=x, ipdf=ipdf)
+#     ret = _derivative(test, eps, ipdf, pdf_pars.parinarr[0,:], x)
+
+    mypdf = pdf_pars.derivatives
+    if pdfout > 1e-5 and chi2_pars.ipdf_newmin >0:
+        pass
+
     pdf_pars.parin_newmin_reset=False
-
-
-    # print(pdfout,test)
-    # os.quit()
 
     return pdfout
 
 def pdfs_msht(ipdf,pars,x):
-
-    
+    """
+        Compute a MSHT PDF given a set of parameters ``pars'' for x=x
+    """
     etaq=pars[57]
-
 
     if etaq < 0.0:
         etaqt=np.power(1.-x,-etaq)
@@ -766,6 +940,8 @@ def int_g2_msht(ain,xmin):
 
 
 def sumrules(parin):
+    """
+    Modify the set of input parameters so that the sum rules are fulfilled"""
     
     out=parin.copy()
 
@@ -845,7 +1021,7 @@ def sumrules(parin):
     return out
 
 def initpars():
-
+    """Prepare the whole set of initial parameters"""
     auv=uv_init()
     adv=dv_init()
     asea=sea_init()
@@ -854,7 +1030,6 @@ def initpars():
     asm=smin_init()
     adbub=dbub_init()
     fitcharm=fitcharm_init()
-
 
     # pdfpars=np.concatenate((auv,adv,asea,asp,ag,asm,adbub))  
     pdfpars=np.concatenate((auv,adv,asea,asp,ag,asm,adbub,fitcharm))  
@@ -922,19 +1097,20 @@ def dbub_init():
     
     return a
 
-def parset(af,parin):
+def parset(af, parin, are_free=None):
+    """
+        Takes an array of free parameters (``af``)
+        and an array with all parameters in the problem (``parin``).
+        Returns an array where the free parameters of ``parin`` are substituted with those in ``af``.
+        Whether the parameters are to be considered free or not is given by the ``are_free`` array.
 
-    afi=af.copy()
-    out=parin.copy()
+        Note: the parameters in ``af`` should be order like in ``parin``.
+    """
+    if are_free is None:
+        are_free = pdf_pars.par_isf
 
-
-    for i in range(1,basis_pars.n_pars):
-        if pdf_pars.par_isf[i]:
-            out[i]=afi[0]
-            afi=np.delete(afi,0)
-    
-
-
+    out = parin.copy()
+    out[are_free.astype(bool)] = af
     return out
 
 def parcheck(pars):
@@ -1072,9 +1248,12 @@ def parinc_eps(parin,ipar,eps):
 
     return eps_n
 
-def parinc_newmin(parin,ipar,eps):
+def parinc_newmin(parin,ipar,eps, true_idx=False):
 
-    npar=pdf_pars.par_free_i[ipar]
+    if true_idx:
+        npar = ipar
+    else:
+        npar=pdf_pars.par_free_i[ipar]
 
     # eps_n=eps*np.abs(parin[npar])
     eps_n=eps
