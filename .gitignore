@@ -9,3 +9,6 @@ tmp_lhapdf
 pixi.lock
 pixi.toml
 
+# pixi environments
+.pixi/*
+!.pixi/config.toml

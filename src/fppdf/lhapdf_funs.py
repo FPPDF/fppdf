@@ -4,8 +4,8 @@ import shutil
 import lhapdf
 import numpy as np
 
-from fixparpdf.global_pars import fit_pars, pdf_pars
-from fixparpdf.pdfs import pdfs_msht
+from fppdf.global_pars import fit_pars, pdf_pars
+from fppdf.pdfs import pdfs_msht
 
 
 def initlha(name, lhdir):

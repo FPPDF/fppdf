@@ -9,8 +9,8 @@ import scipy.stats as st
 from validphys.api import API
 from validphys.calcutils import calc_chi2
 
-from fixparpdf.data_theory import compute_theory, dat_calc_rep, pos_calc
-from fixparpdf.global_pars import (
+from fppdf.data_theory import compute_theory, dat_calc_rep, pos_calc
+from fppdf.global_pars import (
     chi2_pars,
     dload_pars,
     fit_pars,
@@ -19,7 +19,7 @@ from fixparpdf.global_pars import (
     pdf_pars,
     shared_global_data,
 )
-from fixparpdf.pdfs import MSHTPDF, initpars, parcheck, parset, sumrules
+from fppdf.pdfs import MSHTPDF, initpars, parcheck, parset, sumrules
 
 
 class ParameterError(Exception):

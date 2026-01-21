@@ -5,7 +5,7 @@ import time
 
 from reportengine.utils import yaml_safe
 
-from fixparpdf.utils import existing_path, init_global_pars
+from fppdf.utils import existing_path, init_global_pars
 
 
 def main():
@@ -21,9 +21,9 @@ def main():
     # init global variables
     init_global_pars(config)
 
-    from fixparpdf.error_calc import hesserror_dynamic_tol_new, hesserror_new
-    from fixparpdf.global_pars import chi2_pars, fit_pars
-    from fixparpdf.inputs import readincov
+    from fppdf.error_calc import hesserror_dynamic_tol_new, hesserror_new
+    from fppdf.global_pars import chi2_pars, fit_pars
+    from fppdf.inputs import readincov
 
     # Override a bunch of parameters
     chi2_pars.t0 = True
