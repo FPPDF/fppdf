@@ -1,11 +1,11 @@
-import shutil
 from pathlib import Path
+import shutil
 
 import lhapdf
 import numpy as np
 
-from global_pars import fit_pars, pdf_pars
-from pdfs import pdfs_msht
+from fixparpdf.global_pars import fit_pars, pdf_pars
+from fixparpdf.pdfs import pdfs_msht
 
 
 def initlha(name, lhdir):
@@ -23,16 +23,7 @@ def initlha(name, lhdir):
 
 def writelha_end(name, lhdir, parin):
     """Write the PDF to the LHAPDF (lhdir) directory given some input parameters"""
-    # TODO: take a PDF class instead
-
-    output = lhdir + name + "/" + name + "_0000.dat"
-    if fit_pars.irep < 10:
-        output = lhdir + name + "/" + name + "_000" + str(fit_pars.irep) + ".dat"
-    elif fit_pars.irep < 100:
-        output = lhdir + name + "/" + name + "_00" + str(fit_pars.irep) + ".dat"
-    else:
-        output = lhdir + name + "/" + name + "_0" + str(fit_pars.irep) + ".dat"
-
+    output = Path(lhdir) / name / f"{name}_{fit_pars.irep:04}.dat"
     with open(output, "w") as outputfile:
 
         outputfile.write("PdfType: replica")

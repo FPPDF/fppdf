@@ -9,8 +9,6 @@ from math import gamma
 import numba as nb
 import numpy as np
 
-from global_pars import *
-
 
 @nb.njit
 def I(a, b):
@@ -192,12 +190,6 @@ def Ic7(a, b):
 @nb.njit
 def Ic8(a, b):
 
-    out = (
-        128.0 * Iy8(a, b)
-        - 256.0 * Iy6(a, b)
-        + 160.0 * Iy4(a, b)
-        - 32.0 * Iy2(a, b)
-        + I(a, b)
-    )
+    out = 128.0 * Iy8(a, b) - 256.0 * Iy6(a, b) + 160.0 * Iy4(a, b) - 32.0 * Iy2(a, b) + I(a, b)
 
     return out

@@ -1,9 +1,9 @@
-# input files
+# inputnams
 inputs:
   # PDF parameter inputs:  
-  input file: input_mshtfit_publication_longmin.dat
+  inputnam: input_mshtfit_publication_longmin.dat
   # input covariance matrix file (if used)
-  cov input file: newmin_final_remin_out.dat
+  covinput: newmin_final_remin_out.dat
   # if true then read in covariance matrix and evaluate PDF errors
   readcov: False
 

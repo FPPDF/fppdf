@@ -240,8 +240,6 @@ if os.environ.get("LHAPDF_DATA_PATH") is not None:
 else:
     pdf_pars.lhapdfdir = get_lha_datapath() + "/"
 
-if DEBUG:
-    pdf_pars.tmp_lhapdfdir = TEMP_LHAPDF
 profile=_get_nnpdf_profile(None)
 fit_pars.datapath=pathlib.Path(profile["data_path"])
 # fit_pars.theories_path=pathlib.Path(profile["theories_path"])

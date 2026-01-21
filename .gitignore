@@ -5,3 +5,7 @@ git_push.sh
 __pycache__
 outputs/
 tmp_lhapdf
+.gitattributes
+pixi.lock
+pixi.toml
+

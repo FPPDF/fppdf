@@ -1,11 +1,11 @@
-import functools
 from copy import deepcopy
+import functools
 
 import numba as nb
 import numpy as np
 
-import chebyshevs as cheb
-from global_pars import *
+import fixparpdf.chebyshevs as cheb
+from fixparpdf.global_pars import basis_pars, pdf_pars, shared_global_data
 
 try:
     from scipy.integrate import quadrature
@@ -57,13 +57,7 @@ class MSHTSet(LHAPDFSet):
     """
 
     def __init__(
-        self,
-        pdf_function,
-        parameters,
-        name,
-        error_type="replicas",
-        variation=None,
-        theta_idx=None,
+        self, pdf_function, parameters, name, error_type="replicas", variation=None, theta_idx=None
     ):
         self._error_type = error_type
         self._name = name
@@ -94,7 +88,7 @@ class MSHTSet(LHAPDFSet):
         """Whether this is a PDF of its derivative"""
         return self._variation is not None
 
-    @cache
+    @functools.cache
     def _xfxQ(self, x: _Hashrray, Q: float, n: int, fl: int):
         """Return the PDF value for one single point for one single member
         Note that in this case both scale (Q) and member (n) are ignored.
@@ -399,33 +393,15 @@ def Phi_msht_int():
     xmin = 1e-6
     xmax = 0.5
 
-    if (
-        fit_pars.theoryidi == 211
-        or fit_pars.theoryidi == 40001000
-        or fit_pars.theoryidi == 50001000
-    ):
-        pdfmax = 8
-    else:
-        pdfmax = 9
-
-    if (
-        fit_pars.theoryidi == 211
-        or fit_pars.theoryidi == 40001000
-        or fit_pars.theoryidi == 50001000
-    ):
+    thid = shared_global_data["data"].theoryid
+    if thid in (211, 40001000, 50001000):
         pdfmax = 3
     else:
         pdfmax = 4
 
     out = []
 
-    # for pdfi in range (1,pdfmax):
-    #     print(pdfi)
-    #     outi=quadrature(arclength_msht,xmin,xmax,args=(pdfi,),rtol=1.0e-04,maxiter=5000)[0]
-    #     out=np.append(outi,out)
-
     for pdfi in range(-pdfmax, pdfmax + 1):
-        print(pdfi)
         outi = quadrature(arclength_msht, xmin, xmax, args=(pdfi,), rtol=1.0e-04, maxiter=5000)[0]
         out = np.append(outi, out)
 
@@ -984,11 +960,7 @@ def msum_ag(pars):
     # outng=0.608941296908194
 
     outg1 = int_g1_msht(
-        ag,
-        xmin,
-        two_terms=basis_pars.g_second_term,
-        cheb8=c8,
-        g_cheb7=basis_pars.g_cheb7,
+        ag, xmin, two_terms=basis_pars.g_second_term, cheb8=c8, g_cheb7=basis_pars.g_cheb7
     )
     outg2 = int_g2_msht(ag, xmin, two_terms=basis_pars.g_second_term)
 
@@ -1321,10 +1293,11 @@ def parcheck(pars: np.ndarray) -> bool:
         print("PARCHECK : delgp < -1")
         err = True
 
-    gptest = cheb.I(delgp, etagp)
-    if gptest < 1e-50:
-        print("PARCHECK : delgp,etagp too high - unstable")
-        err = True
+    if not err:
+        gptest = cheb.I(delgp, etagp)
+        if gptest < 1e-50:
+            print("PARCHECK : delgp,etagp too high - unstable")
+            err = True
 
     if delsea < -1:
         print("PARCHECK : delsea < -1")
