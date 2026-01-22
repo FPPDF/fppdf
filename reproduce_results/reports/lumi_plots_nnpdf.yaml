@@ -1,0 +1,31 @@
+meta:
+  title: PDF comparison
+  author: tg
+  keywords: [PDF plots fixpar]
+
+
+pdfs:
+ - {id: "251030-tg-nnlo_iterated", label: "NNLO nnpdf"}
+ - {id: "251030-tg-nnlo-mhou_iterated", label: "NNLO MHOU nnpdf"}
+ - {id: "251030-tg-an3lo-mhou_iterated", label: "aN3LO MHOU nnpdf"}
+
+ymin: 0.9
+ymax: 1.10
+sqrts: 13600
+
+lumispecs:
+ - lumi_channel: gg
+ - lumi_channel: gq
+ - lumi_channel: qq
+ - lumi_channel: qqbar
+
+normalize_to: 1      # Specify index in list of PDFs or name of PDF
+normtitle: Ratio
+
+template_text: |
+  {@with lumispecs@}
+  {@plot_lumi1d@}
+  {@endwith@}
+
+actions_:
+  - report(main=True)

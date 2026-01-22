@@ -1,0 +1,32 @@
+meta:
+  title: PDF comparison
+  author: tg
+  keywords: [PDF plots fixpar]
+
+
+pdfs:
+ - {id: "250918-jcm-fitted-charm-nnlo_lhl_dyntol", label: "NNLO fixpar"}
+ - {id: "250918-jcm-fitted-charm-nnlo-mhou_lhl_dyntol", label: "NNLO MHOU fixpar"}
+ - {id: "250918-jcm-fitted-charm-n3lo_lhl_dyntol", label: "aN3LO MHOU fixpar"}
+
+Q: 100
+
+ymin: 0.9
+ymax: 1.10
+sqrts: 13600
+lumispecs:
+ - lumi_channel: gg
+ - lumi_channel: gq
+ - lumi_channel: qq
+ - lumi_channel: qqbar
+
+normalize_to: 1      # Specify index in list of PDFs or name of PDF
+normtitle: Ratio
+
+template_text: |
+  {@with lumispecs@}
+  {@plot_lumi1d@}
+  {@endwith@}
+
+actions_:
+  - report(main=True)
