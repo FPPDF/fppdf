@@ -1,7 +1,7 @@
 from pathlib import Path
-import shutil
 
 import lhapdf
+from validphys.api import API
 import numpy as np
 
 from fppdf.global_pars import fit_pars, pdf_pars
@@ -10,19 +10,14 @@ from fppdf.pdfs import pdfs_msht
 
 def initlha(name, lhdir):
     """Initialize a LHAPDF directory"""
-
-    # dirin=pdf_pars.lhapdfdir+'NNPDF40_nnlo_pch_as_01180/'+'NNPDF40_nnlo_pch_as_01180.info'
-    dirin = "input/MSHT20nnlo_as118_mem1.info"
-
     lhdir = Path(lhdir)
     dirlha = lhdir / name
     dirlha.mkdir(exist_ok=True, parents=True)
 
-    shutil.copy(dirin, dirlha / f"{name}.info")
-
 
 def writelha_end(name, lhdir, parin):
-    """Write the PDF to the LHAPDF (lhdir) directory given some input parameters"""
+    """Write the PDF to the lhdir directory given some input parameters"""
+
     output = Path(lhdir) / name / f"{name}_{fit_pars.irep:04}.dat"
     with open(output, "w") as outputfile:
 
@@ -32,8 +27,9 @@ def writelha_end(name, lhdir, parin):
         outputfile.write("\n")
         outputfile.write("---")
 
-        #        PDFlabelmsht='MSHT20nnlo_as118'
-        PDFlabelmsht = "NNPDF40_nnlo_pch_as_01180"
+        # Use NNPDF x-grid for the default output
+        PDFlabelmsht = "NNPDF40_nnlo_as_01180"
+        _ = API.pdf(pdf=PDFlabelmsht)
         inputf = pdf_pars.lhapdfdir + PDFlabelmsht + "/" + PDFlabelmsht + "_0000.dat"
         filein = open(inputf, "r")
         content = filein.readlines()
@@ -57,7 +53,7 @@ def writelha_end(name, lhdir, parin):
         outputfile.write("\n")
 
         if pdf_pars.lhin:
-            pset = lhapdf.getPDFSet(pdf_pars.PDFlabel_lhin)
+            pset = lhapdf.getPDFNNPDF40_nnlo_pch_as_01180Set(pdf_pars.PDFlabel_lhin)
             pdfs = pset.mkPDFs()
 
         pdfarr = np.zeros(11)

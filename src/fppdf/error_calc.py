@@ -1,5 +1,4 @@
 from pathlib import Path
-import sys
 
 import numpy as np
 import scipy.linalg as la
@@ -8,7 +7,6 @@ from scipy.optimize import newton
 from fppdf.chi2s import chi2min, chi2min_fun
 from fppdf.global_pars import chi2_pars, dload_pars, fit_pars, inout_pars, pdf_pars
 from fppdf.outputs import evgrido, gridout, parsout, covmatout_err, parsout_err
-from fppdf.pdfs import MSHTPDF
 
 OUTDIR_EV = Path("outputs/evscans")
 OUTDIR_EV.mkdir(exist_ok=True, parents=True)
@@ -34,12 +32,6 @@ def hesserror_dynamic_tol_new(afi, hess, jaci):
     chi2_pars.chi2ind = True
     chi2_pars.chitotind = False
     chi2_pars.L0 = False
-
-    #   Remove the lat lam_sub eigenevectors from scan 
-    lam_sub=30
-
-    # hessinv=la.inv(hess)
-    # lamt,eigt = la.eigh(hessinv)
 
     pdfout = True
     # For closure tests use experimental cov matrix (quicker)
@@ -79,7 +71,7 @@ def hesserror_dynamic_tol_new(afi, hess, jaci):
     output_log.write_text(f"chi2_0 = {chi0:.5f}, neig = {len(lam)}")
 
     #   Loop over eigenvectors
-    for j in range(0, len(lam)-lam_sub):
+    for j in range(0, len(lam)-chi2_pars.lam_sub):
         print('j = ', j)
 
         # jth eigenvector
@@ -430,9 +422,6 @@ def hesserror_new_call(afi, hessin,irun):
     hess=hessin.copy()
     af_out=afi.copy()
 
-#   Remove the lat lam_sub eigenevectors from scan 
-    lam_sub=30
-
     end_run=False
 
     if msht_fix:
@@ -496,11 +485,8 @@ def hesserror_new_call(afi, hessin,irun):
             outputfile.write(str(chi0))
             outputfile.write('\n')
 
-
-
-
     #   Loop over eigenvectors
-    for j in range(0, len(lam)-lam_sub):
+    for j in range(0, len(lam)-chi2_pars.lam_sub):
     # for j in range(49, 50):
         # jth eigenvector
         eig0 = eig[:, j].flatten()

@@ -3,6 +3,7 @@ from pathlib import Path
 import lhapdf
 import numpy as np
 from reportengine.utils import yaml_safe
+from validphys.api import API
 
 from fppdf.global_pars import basis_pars, fit_pars, inout_pars, pdf_pars, shared_global_data
 from fppdf.lhapdf_funs import initlha, writelha_end
@@ -18,6 +19,7 @@ RES_F = OUTPUT_F / "res"
 COV_F = OUTPUT_F / "cov"
 for PF in [BUFFER_F, PARS_F, EVGRIDS_F, PLOTS_F, RES_F, COV_F, GRIDS_F]:
     PF.mkdir(exist_ok=True, parents=True)
+
 
 def covmatout_err(hessi, jaci):
 
@@ -463,6 +465,7 @@ def resout(pospeni, pospenf, chi2t0i, chi2expi, chi2t0f, chi2expf, n):
     outputfile.write(str(pospenf))
     outputfile.write("\n")
 
+
 def parsout_err(output_filename=None):
     """Write down the parameters of the PDF fit.
     If an output filename is not given, it will default to the label.
@@ -473,7 +476,6 @@ def parsout_err(output_filename=None):
     output_filename = output_filename + '_scanout'
 
     outputfile = (PARS_F / output_filename).with_suffix(".dat").open("w")
-    
 
     pars = pdf_pars.pdfparsi.copy()
     # auv=pars[0:9]
@@ -568,6 +570,7 @@ def parsout_err(output_filename=None):
         outputfile.write(str(0))
         outputfile.write(" ")
         outputfile.write("\n")
+
 
 def parsout(output_filename=None):
     """Write down the parameters of the PDF fit.
@@ -679,6 +682,8 @@ def plotout():
 
     msht = 'MSHT20nnlo_as118'
     nnpdf = 'NNPDF40_nnlo_pch_as_01180'
+    _ = API.pdf(pdf=msht)
+    _ = API.pdf(pdf=nnpdf)
     pset_msht = lhapdf.getPDFSet(msht)
     lh_msht = pset_msht.mkPDFs()
 
