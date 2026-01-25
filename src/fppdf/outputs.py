@@ -20,6 +20,8 @@ COV_F = OUTPUT_F / "cov"
 for PF in [BUFFER_F, PARS_F, EVGRIDS_F, PLOTS_F, RES_F, COV_F, GRIDS_F]:
     PF.mkdir(exist_ok=True, parents=True)
 
+MEMBER_NAME = "member"
+FITFOLDER_NAME = "fitfolder"
 
 def covmatout_err(hessi, jaci):
 
@@ -119,7 +121,7 @@ def evgrido(pdf_name=None):
         else:
             pdf_name = inout_pars.label
 
-    dirgrid = EVGRIDS_F / pdf_name / "nnfit" / f"replica_{str(fit_pars.irep+1)}"
+    dirgrid = EVGRIDS_F / pdf_name / FITFOLDER_NAME / f"{MEMBER_NAME}_{str(fit_pars.irep+1)}"
     dirgrid.mkdir(exist_ok=True, parents=True)
     output = dirgrid / f"{pdf_name}.exportgrid"
 
@@ -423,6 +425,7 @@ def evgrido(pdf_name=None):
 
     with open(output, 'w') as outputfile:
         yaml_safe.dump(data, outputfile)
+    print(f"Written exportgrid data to {output}")
 
 
 def resout_nofit(pospeni, chi2t0i, chi2expi, n):
@@ -736,6 +739,7 @@ def plotout():
 def gridout(pdf_name=None):
     """Write down the grid in the grids output folder for the given pdf_name
     If a pdf_name is not given, use the label of the fit."""
+    return
     if pdf_name is None:
         pdf_name = inout_pars.label
 

@@ -2,31 +2,13 @@
 
 from argparse import ArgumentParser
 from pathlib import Path
-import shutil
 
-from evolven3fit.evolve import evolve_fit
+from evolven3fit.evolve import ExportGrid, evolve_exportgrids_into_lhapdf
 from reportengine.utils import yaml_safe
 from validphys.loader import FallbackLoader
 
+from fppdf.outputs import EVGRIDS_F, FITFOLDER_NAME, MEMBER_NAME
 from fppdf.utils import existing_path, init_global_pars
-from fppdf.outputs import EVGRIDS_F
-
-
-def create_lhapdf(fit_folder, path_lhapdf):
-    fit_folder = Path(fit_folder)
-    path_lhapdf.mkdir(exist_ok=True)
-
-    members = 0
-    for i, replica_file in enumerate(fit_folder.glob(f"nnfit/replica_*/{fit_folder.name}.dat")):
-        dest_path_replica = path_lhapdf / f"{fit_folder.stem}_{(i):04d}.dat"
-        shutil.copy(replica_file, dest_path_replica)
-        members += 1
-
-    info_data = yaml_safe.load((fit_folder / "nnfit" / f"{fit_folder.name}.info").open("r"))
-    info_data["NumMembers"] = members
-    with (path_lhapdf / f"{fit_folder.name}.info").open("w") as info_out:
-        yaml_safe.dump(info_data, info_out)
-    print(f"Congratulations, you will find you PDF at: {path_lhapdf.absolute().as_posix()}")
 
 
 def main():
@@ -40,7 +22,7 @@ def main():
     config = yaml_safe.load(args.fit_runcard.open("r"))
     init_global_pars(config)
 
-    from fppdf.global_pars import inout_pars, chi2_pars
+    from fppdf.global_pars import chi2_pars, inout_pars
 
     if chi2_pars.dynamic_tol:
         fit_folder = EVGRIDS_F / f"{inout_pars.label}_dyntol"
@@ -55,12 +37,33 @@ def main():
     # Use the FallBackLoader to download any missing PDFs/ekos/theories
     l = FallbackLoader()
     eko_path = l.check_eko(thID)
-    evolve_fit(fit_folder, True, eko_path, hessian_fit=True)
 
+    # Prepare the target LHAPDF file
     lhapath = args.lhapdf_path
     if lhapath is None:
         lhapath = fit_folder / fit_folder.name
-    create_lhapdf(fit_folder, lhapath)
+
+    exportgrids = []
+    output_lhas = []
+    for exportgrid_file in fit_folder.glob(
+        f"{FITFOLDER_NAME}/{MEMBER_NAME}_*/{fit_folder.name}.exportgrid"
+    ):
+        data = yaml_safe.load(exportgrid_file.read_text(encoding="UTF-8"))
+        exportgrids.append(ExportGrid(**data, hessian=True))
+        # Take the member folder as the member number
+        member = int(exportgrid_file.parent.stem.split("_")[-1]) - 1
+        output_lhas.append(lhapath / f"{fit_folder.stem}_{(member):04d}.dat")
+
+    info_path = fit_folder / FITFOLDER_NAME / f"{fit_folder.name}.info"
+    print("Starting evolution...")
+    evolve_exportgrids_into_lhapdf(eko_path, exportgrids, output_lhas, info_path)
+
+    info_data = yaml_safe.load(info_path.open("r"))
+    info_data["NumMembers"] = len(exportgrids)
+    with (lhapath / f"{fit_folder.name}.info").open("w") as info_out:
+        yaml_safe.dump(info_data, info_out)
+
+    print(f"Congratulations, you will find you PDF at: {lhapath.absolute().as_posix()}")
 
 
 if __name__ == "__main__":

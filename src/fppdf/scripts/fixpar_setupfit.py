@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 """
-    Only necessary for the generation of the theory covariance matrix in the relevant subfolder,
-    this is an extension of nnpdf's setupfit script for fixed parametrization.
+Only necessary for the generation of the theory covariance matrix in the relevant subfolder,
+this is an extension of nnpdf's setupfit script for fixed parametrization.
 
-    The extension is done by:
-    1) Removing the n3fit actions and checks that are not necessary here
-    2) Modifying the output paths of the script to point to what fixpar is expecting
+The extension is done by:
+1) Removing the n3fit actions and checks that are not necessary here
+2) Modifying the output paths of the script to point to what fixpar is expecting
 
 """
 from pathlib import Path
