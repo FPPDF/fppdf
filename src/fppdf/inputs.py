@@ -1,7 +1,7 @@
 import numpy as np
 
 from fppdf.global_pars import basis_pars, fit_pars, inout_pars, pdf_pars, shared_global_data
-from fppdf.outputs import BUFFER_F
+from fppdf.outputs import BUFFER_F, COV_F
 
 
 def readincov():
@@ -16,7 +16,7 @@ def readincov():
 
     readjac = True
 
-    inputfile = 'outputs/cov/' + inout_pars.covinput
+    inputfile = COV_F / inout_pars.covinput
 
     disttot = np.loadtxt(inputfile, skiprows=2, max_rows=73)
 
@@ -38,21 +38,10 @@ def readincov():
 
     print(afin)
 
-    # hess=np.loadtxt(inputfile,skiprows=67,max_rows=53)
-    # Old inputnam
-    # hess=np.loadtxt(inputfile,skiprows=67,max_rows=pdf_pars.npar_free)
-    # New free charm inputnam
     hess = np.loadtxt(inputfile, skiprows=76, max_rows=pdf_pars.npar_free)
 
-    #    hessin=np.loadtxt(inputfile,skiprows=68+pdf_pars.npar_free,max_rows=pdf_pars.npar_free)
-
-    # corrmatcalc(hess,afin)
-
     if readjac:
-        # jac=np.loadtxt(inputfile,skiprows=68+pdf_pars.npar_free,max_rows=pdf_pars.npar_free)
         jac = np.loadtxt(inputfile, skiprows=77 + pdf_pars.npar_free, max_rows=pdf_pars.npar_free)
-    #        jac=np.loadtxt(inputfile,skiprows=68+2*pdf_pars.npar_free,max_rows=pdf_pars.npar_free)
-    # jac=np.loadtxt(inputfile,skiprows=68+53,max_rows=53)
     else:
         jac = 0.0
 
