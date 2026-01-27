@@ -142,7 +142,7 @@ mcseed: 1
 inout_parameters:
   inputnam: fitted_charm_input_parameters.dat
   # output label
-  label: fixedpar_nnlo_ic_final
+  label: fixedpar_nnlo_ic
 
 fit_parameters:
   # run with fixed input parameters

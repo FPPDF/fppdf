@@ -6,7 +6,6 @@ from reportengine.utils import yaml_safe
 from validphys.api import API
 
 from fppdf.global_pars import basis_pars, fit_pars, inout_pars, pdf_pars, shared_global_data
-from fppdf.lhapdf_funs import initlha, writelha_end
 from fppdf.pdfs import pdfs_msht
 
 OUTPUT_F = Path("outputs")
@@ -22,6 +21,7 @@ for PF in [BUFFER_F, PARS_F, EVGRIDS_F, PLOTS_F, RES_F, COV_F, GRIDS_F]:
 
 MEMBER_NAME = "member"
 FITFOLDER_NAME = "fitfolder"
+
 
 def covmatout_err(hessi, jaci):
 
@@ -734,15 +734,3 @@ def plotout():
 
             np.savetxt(outputfile, pdfarr, fmt="%.7E", delimiter=' ', newline=' ')
             outputfile.write('\n')
-
-
-def gridout(pdf_name=None):
-    """Write down the grid in the grids output folder for the given pdf_name
-    If a pdf_name is not given, use the label of the fit."""
-    return
-    if pdf_name is None:
-        pdf_name = inout_pars.label
-
-    initlha(pdf_name, GRIDS_F)
-    pdf_pars.PDFlabel = pdf_name
-    writelha_end(pdf_name, GRIDS_F, pdf_pars.pdfparsi)
