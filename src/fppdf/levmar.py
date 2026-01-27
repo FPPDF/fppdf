@@ -4,9 +4,9 @@ from pathlib import Path
 import numpy as np
 from scipy import linalg as la
 
-from fixparpdf.chi2s import chi2min_fun, hess_zeros
-from fixparpdf.global_pars import chi2_pars, dload_pars, fit_pars, inout_pars, min_pars, pdf_pars
-from fixparpdf.outputs import covmatout, parsout
+from fppdf.chi2s import chi2min_fun, hess_zeros
+from fppdf.global_pars import chi2_pars, dload_pars, fit_pars, inout_pars, min_pars, pdf_pars
+from fppdf.outputs import covmatout, parsout
 import tracemalloc
 
 

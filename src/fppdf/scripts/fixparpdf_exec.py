@@ -5,15 +5,15 @@ import time
 
 from reportengine.utils import yaml_safe
 
-from fixparpdf.utils import existing_path, init_global_pars
+from fppdf.utils import existing_path, init_global_pars
 
 
 def _no_free_parameters(vp_pdf):
     """Just output the various chi2 and stat information."""
     # TODO: to be removed, this can be done through VP directly I think
-    from fixparpdf.chi2s import chi2min
-    from fixparpdf.global_pars import chi2_pars, fit_pars, inout_pars
-    from fixparpdf.outputs import evgrido, gridout, parsout, plotout, resout_nofit
+    from fppdf.chi2s import chi2min
+    from fppdf.global_pars import chi2_pars, fit_pars, inout_pars
+    from fppdf.outputs import evgrido, gridout, parsout, plotout, resout_nofit
 
     if inout_pars.pdout:
         print('Output PD to file...')
@@ -69,7 +69,7 @@ def main():
     # init global variables
     init_global_pars(config)
     # import global variables to be used in this module
-    from fixparpdf.global_pars import (
+    from fppdf.global_pars import (
         chi2_pars,
         dload_pars,
         fit_pars,
@@ -83,7 +83,7 @@ def main():
 
     # TODO: the input files right now are read through the global_pars
     # they can be given to the right functions directly here
-    from fixparpdf.inputs import readin
+    from fppdf.inputs import readin
 
     afi = readin()
     outputfile = open('outputs/buffer/' + inout_pars.label + '.dat', 'a')
@@ -91,7 +91,7 @@ def main():
 
     from validphys.api import API
 
-    from fixparpdf.pdfs import MSHTPDF, initpars, parset, sumrules
+    from fppdf.pdfs import MSHTPDF, initpars, parset, sumrules
 
     # Prepare the initial PDF that might be used for the computation
     # of the chi2, the minimization, etc.
@@ -115,8 +115,8 @@ def main():
 
     print('Using LM algorithm...')
     print(f"afi = {afi}")
-    from fixparpdf.chi2s import chi2min
-    from fixparpdf.levmar import levmar
+    from fppdf.chi2s import chi2min
+    from fppdf.levmar import levmar
 
     if pdf_closure.pdpdf:
 
@@ -196,7 +196,7 @@ def main():
 
         print('afo = ', afo)
 
-    from fixparpdf.outputs import evgrido, gridout, parsout, plotout, resout
+    from fppdf.outputs import evgrido, gridout, parsout, plotout, resout
 
     fit_pars.pos_const = False
     chi2t0f = chi2min(afo)

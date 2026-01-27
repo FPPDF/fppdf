@@ -4,8 +4,8 @@ import functools
 import numba as nb
 import numpy as np
 
-import fixparpdf.chebyshevs as cheb
-from fixparpdf.global_pars import basis_pars, pdf_pars, shared_global_data
+import fppdf.chebyshevs as cheb
+from fppdf.global_pars import basis_pars, pdf_pars, shared_global_data
 
 try:
     from scipy.integrate import quadrature

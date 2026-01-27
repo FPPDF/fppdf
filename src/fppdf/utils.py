@@ -5,7 +5,7 @@ Common functions to fixparpdf and hessianerr scripts
 from argparse import ArgumentTypeError
 from pathlib import Path
 
-from fixparpdf import global_pars
+from fppdf import global_pars
 
 
 def existing_path(value):

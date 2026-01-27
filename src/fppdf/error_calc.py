@@ -5,10 +5,10 @@ import numpy as np
 import scipy.linalg as la
 from scipy.optimize import newton
 
-from fixparpdf.chi2s import chi2min, chi2min_fun
-from fixparpdf.global_pars import chi2_pars, dload_pars, fit_pars, inout_pars, pdf_pars
-from fixparpdf.outputs import evgrido, gridout, parsout, covmatout_err, parsout_err
-from fixparpdf.pdfs import MSHTPDF
+from fppdf.chi2s import chi2min, chi2min_fun
+from fppdf.global_pars import chi2_pars, dload_pars, fit_pars, inout_pars, pdf_pars
+from fppdf.outputs import evgrido, gridout, parsout, covmatout_err, parsout_err
+from fppdf.pdfs import MSHTPDF
 
 OUTDIR_EV = Path("outputs/evscans")
 OUTDIR_EV.mkdir(exist_ok=True, parents=True)

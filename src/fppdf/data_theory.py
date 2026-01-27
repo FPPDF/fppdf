@@ -2,7 +2,7 @@ from functools import cache
 
 import numpy as np
 
-from fixparpdf.global_pars import fit_pars, pdf_pars, shared_global_data
+from fppdf.global_pars import fit_pars, pdf_pars, shared_global_data
 
 
 @cache

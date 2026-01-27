@@ -4,9 +4,9 @@ import lhapdf
 import numpy as np
 from reportengine.utils import yaml_safe
 
-from fixparpdf.global_pars import basis_pars, fit_pars, inout_pars, pdf_pars, shared_global_data
-from fixparpdf.lhapdf_funs import initlha, writelha_end
-from fixparpdf.pdfs import pdfs_msht
+from fppdf.global_pars import basis_pars, fit_pars, inout_pars, pdf_pars, shared_global_data
+from fppdf.lhapdf_funs import initlha, writelha_end
+from fppdf.pdfs import pdfs_msht
 
 OUTPUT_F = Path("outputs")
 BUFFER_F = OUTPUT_F / "buffer"
