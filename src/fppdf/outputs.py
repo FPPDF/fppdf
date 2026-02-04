@@ -3,9 +3,9 @@ from pathlib import Path
 import lhapdf
 import numpy as np
 from reportengine.utils import yaml_safe
+from validphys.api import API
 
 from fppdf.global_pars import basis_pars, fit_pars, inout_pars, pdf_pars, shared_global_data
-from fppdf.lhapdf_funs import initlha, writelha_end
 from fppdf.pdfs import pdfs_msht
 
 OUTPUT_F = Path("outputs")
@@ -18,6 +18,10 @@ RES_F = OUTPUT_F / "res"
 COV_F = OUTPUT_F / "cov"
 for PF in [BUFFER_F, PARS_F, EVGRIDS_F, PLOTS_F, RES_F, COV_F, GRIDS_F]:
     PF.mkdir(exist_ok=True, parents=True)
+
+MEMBER_NAME = "member"
+FITFOLDER_NAME = "fitfolder"
+
 
 def covmatout_err(hessi, jaci):
 
@@ -117,7 +121,7 @@ def evgrido(pdf_name=None):
         else:
             pdf_name = inout_pars.label
 
-    dirgrid = EVGRIDS_F / pdf_name / "nnfit" / f"replica_{str(fit_pars.irep+1)}"
+    dirgrid = EVGRIDS_F / pdf_name / FITFOLDER_NAME / f"{MEMBER_NAME}_{str(fit_pars.irep+1)}"
     dirgrid.mkdir(exist_ok=True, parents=True)
     output = dirgrid / f"{pdf_name}.exportgrid"
 
@@ -421,6 +425,7 @@ def evgrido(pdf_name=None):
 
     with open(output, 'w') as outputfile:
         yaml_safe.dump(data, outputfile)
+    print(f"Written exportgrid data to {output}")
 
 
 def resout_nofit(pospeni, chi2t0i, chi2expi, n):
@@ -463,6 +468,7 @@ def resout(pospeni, pospenf, chi2t0i, chi2expi, chi2t0f, chi2expf, n):
     outputfile.write(str(pospenf))
     outputfile.write("\n")
 
+
 def parsout_err(output_filename=None):
     """Write down the parameters of the PDF fit.
     If an output filename is not given, it will default to the label.
@@ -473,7 +479,6 @@ def parsout_err(output_filename=None):
     output_filename = output_filename + '_scanout'
 
     outputfile = (PARS_F / output_filename).with_suffix(".dat").open("w")
-    
 
     pars = pdf_pars.pdfparsi.copy()
     # auv=pars[0:9]
@@ -568,6 +573,7 @@ def parsout_err(output_filename=None):
         outputfile.write(str(0))
         outputfile.write(" ")
         outputfile.write("\n")
+
 
 def parsout(output_filename=None):
     """Write down the parameters of the PDF fit.
@@ -679,6 +685,8 @@ def plotout():
 
     msht = 'MSHT20nnlo_as118'
     nnpdf = 'NNPDF40_nnlo_pch_as_01180'
+    _ = API.pdf(pdf=msht)
+    _ = API.pdf(pdf=nnpdf)
     pset_msht = lhapdf.getPDFSet(msht)
     lh_msht = pset_msht.mkPDFs()
 
@@ -726,14 +734,3 @@ def plotout():
 
             np.savetxt(outputfile, pdfarr, fmt="%.7E", delimiter=' ', newline=' ')
             outputfile.write('\n')
-
-
-def gridout(pdf_name=None):
-    """Write down the grid in the grids output folder for the given pdf_name
-    If a pdf_name is not given, use the label of the fit."""
-    if pdf_name is None:
-        pdf_name = inout_pars.label
-
-    initlha(pdf_name, GRIDS_F)
-    pdf_pars.PDFlabel = pdf_name
-    writelha_end(pdf_name, GRIDS_F, pdf_pars.pdfparsi)

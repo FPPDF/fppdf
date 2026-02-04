@@ -13,7 +13,7 @@ def _no_free_parameters(vp_pdf):
     # TODO: to be removed, this can be done through VP directly I think
     from fppdf.chi2s import chi2min
     from fppdf.global_pars import chi2_pars, fit_pars, inout_pars
-    from fppdf.outputs import evgrido, gridout, parsout, plotout, resout_nofit
+    from fppdf.outputs import evgrido, parsout, plotout, resout_nofit
 
     if inout_pars.pdout:
         print('Output PD to file...')
@@ -49,7 +49,6 @@ def _no_free_parameters(vp_pdf):
     print('chi2(exp) in (no pos pen):', chi2expi, chi2expi / chi2_pars.ndat)
     print('chi2(t0) in (no pos pen):', chi2t0i, chi2t0i / chi2_pars.ndat)
 
-    gridout()
     parsout()
     plotout()
     evgrido()
@@ -69,14 +68,7 @@ def main():
     # init global variables
     init_global_pars(config)
     # import global variables to be used in this module
-    from fppdf.global_pars import (
-        chi2_pars,
-        dload_pars,
-        fit_pars,
-        inout_pars,
-        pdf_closure,
-        pdf_pars,
-    )
+    from fppdf.global_pars import chi2_pars, dload_pars, fit_pars, inout_pars, pdf_closure, pdf_pars
 
     tzero = time.process_time()
     print(tzero)
@@ -196,7 +188,7 @@ def main():
 
         print('afo = ', afo)
 
-    from fppdf.outputs import evgrido, gridout, parsout, plotout, resout
+    from fppdf.outputs import evgrido, parsout, plotout, resout
 
     fit_pars.pos_const = False
     chi2t0f = chi2min(afo)
@@ -206,7 +198,6 @@ def main():
     chi2posf = chi2min(afo)
     pospenf = chi2posf - chi2expf
 
-    gridout()
     parsout()
     plotout()
     evgrido()

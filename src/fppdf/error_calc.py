@@ -1,5 +1,4 @@
 from pathlib import Path
-import sys
 
 import numpy as np
 import scipy.linalg as la
@@ -7,8 +6,7 @@ from scipy.optimize import newton
 
 from fppdf.chi2s import chi2min, chi2min_fun
 from fppdf.global_pars import chi2_pars, dload_pars, fit_pars, inout_pars, pdf_pars
-from fppdf.outputs import evgrido, gridout, parsout, covmatout_err, parsout_err
-from fppdf.pdfs import MSHTPDF
+from fppdf.outputs import evgrido, parsout, covmatout_err, parsout_err
 
 OUTDIR_EV = Path("outputs/evscans")
 OUTDIR_EV.mkdir(exist_ok=True, parents=True)
@@ -29,19 +27,12 @@ def hesserror_dynamic_tol_new(afi, hess, jaci):
     msht_fix = False
 
     if msht_fix:
-        (hess, afi) = hessfix(hess)
+        hess, afi = hessfix(hess)
 
     chi2_pars.chi2ind = True
     chi2_pars.chitotind = False
     chi2_pars.L0 = False
 
-    #   Remove the lat lam_sub eigenevectors from scan 
-    lam_sub=30
-
-    # hessinv=la.inv(hess)
-    # lamt,eigt = la.eigh(hessinv)
-
-    pdfout = True
     # For closure tests use experimental cov matrix (quicker)
     if inout_pars.pdin:
         chi2_pars.t0 = False
@@ -70,16 +61,14 @@ def hesserror_dynamic_tol_new(afi, hess, jaci):
     chi0 = chi2min(afi)
 
     #   Output central grid and increase replica number ready for eigenvector generation
-    if pdfout:
-        evgrido(pdf_name)
-        gridout(pdf_name)
-        fit_pars.irep = fit_pars.irep + 1
+    evgrido(pdf_name)
+    fit_pars.irep = fit_pars.irep + 1
 
     #   Header for evscan file
     output_log.write_text(f"chi2_0 = {chi0:.5f}, neig = {len(lam)}")
 
     #   Loop over eigenvectors
-    for j in range(0, len(lam)-lam_sub):
+    for j in range(0, len(lam) - chi2_pars.lam_sub):
         print('j = ', j)
 
         # jth eigenvector
@@ -96,7 +85,7 @@ def hesserror_dynamic_tol_new(afi, hess, jaci):
 
                 tchi = delt * k * i
                 print('tchi = ', tchi)
-                (_, dchi2max, arg_dchi2max, chi2t) = get_chi2_ind(af, tchi, eig0.copy())
+                _, dchi2max, arg_dchi2max, chi2t = get_chi2_ind(af, tchi, eig0.copy())
 
                 if chi2t > 1e40:
                     print('shift outside allowed region -> reduce t')
@@ -109,7 +98,7 @@ def hesserror_dynamic_tol_new(afi, hess, jaci):
                     delt = np.abs(tchi) / 5.0
                     tchi = delt * k * i
                     print('tchi = ', tchi)
-                    (_, dchi2max, arg_dchi2max, chi2t) = get_chi2_ind(af, tchi, eig0.copy())
+                    _, dchi2max, arg_dchi2max, chi2t = get_chi2_ind(af, tchi, eig0.copy())
 
                 if dchi2max > 1e1:
                     tchi_i = tchi - delt * i
@@ -120,7 +109,7 @@ def hesserror_dynamic_tol_new(afi, hess, jaci):
                         tchi_del /= 2.0
                         tchi = tchi_i + tchi_del * i
                         print('tchi = ', tchi)
-                        (_, dchi2, arg_dchi2max, chi2t) = get_chi2_ind(af, tchi, eig0.copy())
+                        _, dchi2, arg_dchi2max, chi2t = get_chi2_ind(af, tchi, eig0.copy())
                     print('tchi out = ', tchi)
 
                 # test=newton_func_ind(tchi,af,eig0,arg_dchi2max)
@@ -143,14 +132,14 @@ def hesserror_dynamic_tol_new(afi, hess, jaci):
                         while dchi2 < 1.0:
                             tchi += delt
                             print('tchi = ', tchi)
-                            (deltachi2_lim, dchi2, arg_dchi2max, chi2t) = get_chi2_ind(
+                            deltachi2_lim, dchi2, arg_dchi2max, chi2t = get_chi2_ind(
                                 af, tchi, eig0.copy()
                             )
                         tchi_out = tchi
 
                     print('tchi_out = ', tchi_out)
                     # afin=af.copy()+tchi_out*eig0.copy()
-                    (_, dchi2, arg_dchi2max, chi2t) = get_chi2_ind(af, tchi_out, eig0.copy())
+                    _, dchi2, arg_dchi2max, chi2t = get_chi2_ind(af, tchi_out, eig0.copy())
                     # delchi2t=chi2min(afin)-chi0
                     delchi2t = chi2t - chi0
                     print('delchi2 out = ', delchi2t)
@@ -158,9 +147,7 @@ def hesserror_dynamic_tol_new(afi, hess, jaci):
                         print('tchi leads to unstable region of parameter space - set t=0')
                         tchi_out = 1e-10
                         delchi2t = 0.0
-                    evscan_output_dyT(
-                        pdfout, j, tchi_out, delchi2t, arg_dchi2max, output_log, pdf_name
-                    )
+                    evscan_output_dyT(j, tchi_out, delchi2t, arg_dchi2max, output_log, pdf_name)
                     break
 
 
@@ -263,14 +250,14 @@ def hessfix(hess):
 
     return (hessout, afin)
 
+
 def hesserror_new_backup(afi, hess):
     """Compute the hessian eigenvectors with fixed tolerance"""
     msht_fix = False
 
     if msht_fix:
-        (hess, afi) = hessfix(hess)
+        hess, afi = hessfix(hess)
 
-    pdfout = True
     delchisq_exact = True
     # For closure tests use experimental cov matrix (quicker)
     if inout_pars.pdin:
@@ -308,10 +295,8 @@ def hesserror_new_backup(afi, hess):
     output_log = OUTDIR_EV / f"{inout_pars.label}_tol={chi2_pars.t2_err}.dat"
 
     #   Output central grid and increase replica number ready for eigenvector generation
-    if pdfout:
-        evgrido()
-        gridout()
-        fit_pars.irep = fit_pars.irep + 1
+    evgrido()
+    fit_pars.irep = fit_pars.irep + 1
 
     #   Header for evscan file
     output_log.write_text(f"chi2_0 = {chi0:.5f}, neig = {len(lam)}")
@@ -349,25 +334,25 @@ def hesserror_new_backup(afi, hess):
             if not delchisq_exact:
                 print('fixed t - output')
                 delchi2pos = chi2_pars.chi_pos1 - chi0pos
-                evscan_output(pdfout, j, tchi, delchi2t, delchi2pos, output_log=output_log)
+                evscan_output(j, tchi, delchi2t, delchi2pos, output_log=output_log)
             elif delchi2t < 0.0:
                 print('delchi^2 less than 0 - minimum not reached!')
-                (tchi, delchi2) = tchi_findmin(chi0, tchi, afi, eig0, tol, output_log=output_log)
+                tchi, delchi2 = tchi_findmin(chi0, tchi, afi, eig0, tol, output_log=output_log)
                 if delchi2 > np.power(tol, 2) * 5.0:
-                    (delchi2, tchi) = dchi2_toolarge(tol, tchi, afi, eig0, chi0, delchi2)
+                    delchi2, tchi = dchi2_toolarge(tol, tchi, afi, eig0, chi0, delchi2)
                 delchi2pos = chi2_pars.chi_pos1 - chi0pos
-                evscan_output(pdfout, j, tchi, delchi2, delchi2pos, output_log=output_log)
+                evscan_output(j, tchi, delchi2, delchi2pos, output_log=output_log)
             elif np.abs(delchi2t - np.power(tol, 2)) < tol_exact:
                 print('|delchi2 - T^2| < ', tol_exact, ' - done')
                 delchi2pos = chi2_pars.chi_pos1 - chi0pos
-                evscan_output(pdfout, j, tchi, delchi2t, delchi2pos, output_log=output_log)
+                evscan_output(j, tchi, delchi2t, delchi2pos, output_log=output_log)
             else:
                 # If delchi^2 really big just keep dividing t/2 before applying Newton's method (quicker)
                 if delchi2t > np.power(tol, 2) * 5.0:
                     _print_verbose(f"Deltachi2 very big, {delchi2t}")
-                    (delchi2t, tchi) = dchi2_toolarge(tol, tchi, afi, eig0, chi0, delchi2t)
+                    delchi2t, tchi = dchi2_toolarge(tol, tchi, afi, eig0, chi0, delchi2t)
                     if delchi2t < 0.0:
-                        (tchi, delchi2t,af_out,dchi_out) = tchi_findmin(
+                        tchi, delchi2t, af_out, dchi_out = tchi_findmin(
                             chi0, tchi, afi, eig0, tol, output_log=output_log
                         )
 
@@ -386,11 +371,11 @@ def hesserror_new_backup(afi, hess):
                     delchi2t = chi2min(afin) - chi0
                     print('delchi2 out = ', delchi2t)
                     if delchi2t > np.power(tol, 2) * 5.0:
-                        (delchi2t, tchi) = dchi2_toolarge(tol, tchi, afi, eig0, chi0, delchi2t)
+                        delchi2t, tchi = dchi2_toolarge(tol, tchi, afi, eig0, chi0, delchi2t)
                     # if np.abs(delchi2t-np.power(tol,2)) < tol_exact:
                     #     print('Now |delchi2 - T^2| < ',tol_exact,' - done')
                     delchi2pos = chi2_pars.chi_pos1 - chi0pos
-                    evscan_output(pdfout, j, tchi_out, delchi2t, delchi2pos, output_log=output_log)
+                    evscan_output(j, tchi_out, delchi2t, delchi2pos, output_log=output_log)
                 except RuntimeError as err:
                     print(err)
                     tchi_out = dload_pars.tchi_newton
@@ -398,47 +383,43 @@ def hesserror_new_backup(afi, hess):
                     afin = afi + tchi_out * eig0
                     delchi2t = chi2min(afin) - chi0
                     delchi2pos = chi2_pars.chi_pos1 - chi0pos
-                    evscan_output(pdfout, j, tchi_out, delchi2t, delchi2pos, output_log=output_log)
+                    evscan_output(j, tchi_out, delchi2t, delchi2pos, output_log=output_log)
 
 
 def hesserror_new(afi_i, hessin_i):
 
-    end_run=True
-    hessin=hessin_i.copy()
-    afi=afi_i.copy()
-    irun=0
+    end_run = True
+    hessin = hessin_i.copy()
+    afi = afi_i.copy()
+    irun = 0
 
     while end_run == True:
 
-        (af_out,end_run)=hesserror_new_call(afi, hessin,irun)
-        irun+=1
+        af_out, end_run = hesserror_new_call(afi, hessin, irun)
+        irun += 1
         if end_run == True:
-            out=chi2min_fun(af_out, True, True)
-            hessout=out[2]/2.
-            covmatout_err(hessout,-out[1]/2.)
+            out = chi2min_fun(af_out, True, True)
+            hessout = out[2] / 2.0
+            covmatout_err(hessout, -out[1] / 2.0)
             parsout_err()
             # print('hessout - ',hessout)
             # print(end_run)
-            hessin=hessout
-            afi=af_out.copy()
+            hessin = hessout
+            afi = af_out.copy()
 
 
-def hesserror_new_call(afi, hessin,irun):
+def hesserror_new_call(afi, hessin, irun):
     """Compute the hessian eigenvectors with fixed tolerance"""
     msht_fix = False
 
-    hess=hessin.copy()
-    af_out=afi.copy()
+    hess = hessin.copy()
+    af_out = afi.copy()
 
-#   Remove the lat lam_sub eigenevectors from scan 
-    lam_sub=30
-
-    end_run=False
+    end_run = False
 
     if msht_fix:
-        (hess, afi) = hessfix(hess)
+        hess, afi = hessfix(hess)
 
-    pdfout = True
     delchisq_exact = True
     # For closure tests use experimental cov matrix (quicker)
     if inout_pars.pdin:
@@ -468,22 +449,15 @@ def hesserror_new_call(afi, hessin,irun):
     #   Rescale
     eig = eig * np.sqrt(lam)
 
-
-
     #   Central chi^2
     chi0 = chi2min(afi)
     chi0pos = chi2_pars.chi_pos1
 
-
     # The name of the log file will depend on the tolerance and whether dynamic tolerance is being used
     output_log = OUTDIR_EV / f"{inout_pars.label}_tol={chi2_pars.t2_err}.dat"
 
-    #   Output central grid and increase replica number ready for eigenvector generation
-    if pdfout:
-        evgrido()
-        gridout()
-        # fit_pars.irep = fit_pars.irep + 1
-        fit_pars.irep = 0
+    evgrido()
+    fit_pars.irep = 0
 
     #   Header for evscan file
     if irun == 0:
@@ -496,12 +470,9 @@ def hesserror_new_call(afi, hessin,irun):
             outputfile.write(str(chi0))
             outputfile.write('\n')
 
-
-
-
     #   Loop over eigenvectors
-    for j in range(0, len(lam)-lam_sub):
-    # for j in range(49, 50):
+    for j in range(0, len(lam) - chi2_pars.lam_sub):
+        # for j in range(49, 50):
         # jth eigenvector
         eig0 = eig[:, j].flatten()
 
@@ -533,8 +504,6 @@ def hesserror_new_call(afi, hessin,irun):
             # by calling chi2min(afin) we are also updating the free parameter pdf_pars.pdfparsi
             chi2t = chi2min(afin)
 
-
-
             delchi2t = chi2t - chi0
             _print_verbose(f"chidel = chi2_tol - chi2_0 = {chi2t} - {chi0} = {delchi2t}")
 
@@ -552,16 +521,18 @@ def hesserror_new_call(afi, hessin,irun):
             if not delchisq_exact:
                 print('fixed t - output')
                 delchi2pos = chi2_pars.chi_pos1 - chi0pos
-                evscan_output(pdfout, j, tchi, delchi2t, delchi2pos, output_log=output_log)
+                evscan_output(j, tchi, delchi2t, delchi2pos, output_log=output_log)
             elif delchi2t < 0.0:
                 print('delchi^2 less than 0 - minimum not reached!')
-                (tchi, delchi2,af_out,dchi_out) = tchi_findmin(chi0, tchi, afi, eig0, tol, output_log=output_log)
+                tchi, delchi2, af_out, dchi_out = tchi_findmin(
+                    chi0, tchi, afi, eig0, tol, output_log=output_log
+                )
                 if delchi2 > np.power(tol, 2) * 5.0:
-                    (delchi2, tchi) = dchi2_toolarge(tol, tchi, afi, eig0, chi0, delchi2)
+                    delchi2, tchi = dchi2_toolarge(tol, tchi, afi, eig0, chi0, delchi2)
                 delchi2pos = chi2_pars.chi_pos1 - chi0pos
-                evscan_output(pdfout, j, tchi, delchi2, delchi2pos, output_log=output_log)
+                evscan_output(j, tchi, delchi2, delchi2pos, output_log=output_log)
                 if dchi_out < -0.2:
-                    end_run=True
+                    end_run = True
                     with open(output_log, 'a') as outputfile:
                         outputfile.write('New min below cutoff : shift mininum and re-evaluate')
                         outputfile.write('\n')
@@ -569,21 +540,23 @@ def hesserror_new_call(afi, hessin,irun):
             elif np.abs(delchi2t - np.power(tol, 2)) < tol_exact:
                 print('|delchi2 - T^2| < ', tol_exact, ' - done')
                 delchi2pos = chi2_pars.chi_pos1 - chi0pos
-                evscan_output(pdfout, j, tchi, delchi2t, delchi2pos, output_log=output_log)
+                evscan_output(j, tchi, delchi2t, delchi2pos, output_log=output_log)
             else:
                 # If delchi^2 really big just keep dividing t/2 before applying Newton's method (quicker)
                 if delchi2t > np.power(tol, 2) * 5.0:
                     _print_verbose(f"Deltachi2 very big, {delchi2t}")
-                    (delchi2t, tchi) = dchi2_toolarge(tol, tchi, afi, eig0, chi0, delchi2t)
+                    delchi2t, tchi = dchi2_toolarge(tol, tchi, afi, eig0, chi0, delchi2t)
                     if delchi2t < 0.0:
-                        (tchi, delchi2t,af_out,dchi_out) = tchi_findmin(
+                        tchi, delchi2t, af_out, dchi_out = tchi_findmin(
                             chi0, tchi, afi, eig0, tol, output_log=output_log
                         )
 
                         if dchi_out < -0.2:
-                            end_run=True
+                            end_run = True
                             with open(output_log, 'a') as outputfile:
-                                outputfile.write('New min below cutoff : shift mininum and re-evaluate')
+                                outputfile.write(
+                                    'New min below cutoff : shift mininum and re-evaluate'
+                                )
                                 outputfile.write('\n')
 
                 # tchi_out=tchi_bruteforce(delchi2t,chi0,tchi,af,eig0,tol)
@@ -601,11 +574,11 @@ def hesserror_new_call(afi, hessin,irun):
                     delchi2t = chi2min(afin) - chi0
                     print('delchi2 out = ', delchi2t)
                     if delchi2t > np.power(tol, 2) * 5.0:
-                        (delchi2t, tchi) = dchi2_toolarge(tol, tchi, afi, eig0, chi0, delchi2t)
+                        delchi2t, tchi = dchi2_toolarge(tol, tchi, afi, eig0, chi0, delchi2t)
                     # if np.abs(delchi2t-np.power(tol,2)) < tol_exact:
                     #     print('Now |delchi2 - T^2| < ',tol_exact,' - done')
                     delchi2pos = chi2_pars.chi_pos1 - chi0pos
-                    evscan_output(pdfout, j, tchi_out, delchi2t, delchi2pos, output_log=output_log)
+                    evscan_output(j, tchi_out, delchi2t, delchi2pos, output_log=output_log)
                 except RuntimeError as err:
                     print(err)
                     tchi_out = dload_pars.tchi_newton
@@ -613,9 +586,10 @@ def hesserror_new_call(afi, hessin,irun):
                     afin = afi + tchi_out * eig0
                     delchi2t = chi2min(afin) - chi0
                     delchi2pos = chi2_pars.chi_pos1 - chi0pos
-                    evscan_output(pdfout, j, tchi_out, delchi2t, delchi2pos, output_log=output_log)
+                    evscan_output(j, tchi_out, delchi2t, delchi2pos, output_log=output_log)
 
-    return (af_out,end_run)
+    return (af_out, end_run)
+
 
 def dchi2_toolarge(tol, tchi, af, eig0, chi0, delchi2in):
 
@@ -664,9 +638,9 @@ def tchi_findmin(chi0, tchi, afi, eig, tol, output_log=None):
                 print('min reached!')
                 t -= delt
                 af = afi.copy() + t * eig
-                af_out=af
+                af_out = af
                 dchi_f = chi2min(af) - chi0
-                dchi_out=dchi_f
+                dchi_out = dchi_f
                 if chi2_pars.chidel_min > dchi_f:
                     chi2_pars.chidel_min = dchi_f
                 print('tchi = ', t)
@@ -682,7 +656,7 @@ def tchi_findmin(chi0, tchi, afi, eig, tol, output_log=None):
     finally:
         outputfile.close()
 
-    return (t, dchi_f,af_out,dchi_out)
+    return (t, dchi_f, af_out, dchi_out)
 
 
 def tchi_bruteforce(delchi, chi0, tchi, afi, eig, tol):
@@ -766,7 +740,7 @@ def newton_func(x, afi, eig, tol, chi0):
     return out
 
 
-def evscan_output_dyT(pdfout, j, tchi, delchi2t, arg_dchi2max, output_log, pdf_name):
+def evscan_output_dyT(j, tchi, delchi2t, arg_dchi2max, output_log, pdf_name):
     """Writte down the result of the dynamic tolerance scan."""
 
     if delchi2t < 0:
@@ -810,13 +784,11 @@ def evscan_output_dyT(pdfout, j, tchi, delchi2t, arg_dchi2max, output_log, pdf_n
         outputfile.writelines(L)
         outputfile.write('\n')
 
-    if pdfout:
-        evgrido(pdf_name)
-        gridout(pdf_name)
-        fit_pars.irep = fit_pars.irep + 1
+    evgrido(pdf_name)
+    fit_pars.irep = fit_pars.irep + 1
 
 
-def evscan_output(pdfout, j, tchi, delchi2t, delchi2pos, output_log=None):
+def evscan_output(j, tchi, delchi2t, delchi2pos, output_log=None):
     """Write down the final results of the scan"""
 
     if output_log is None:
@@ -882,7 +854,5 @@ def evscan_output(pdfout, j, tchi, delchi2t, delchi2pos, output_log=None):
         outputfile.writelines(L)
         outputfile.write('\n')
 
-    if pdfout:
-        evgrido()
-        gridout()
-        fit_pars.irep = fit_pars.irep + 1
+    evgrido()
+    fit_pars.irep = fit_pars.irep + 1

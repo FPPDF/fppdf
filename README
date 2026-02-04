@@ -1,7 +1,8 @@
-FixPar_PDF (name in progress)
------------------------------
+FPPDF
+-----
 
-This is the code of `FixPar_PDF`, an open-source program to perform parametric fit of Parton Distribution Functions (PDFs) using arbitrary functional forms.
+This is the code for `FPPDF` (Fixed Parametrizatin PDF), an open-source program to perform parametric fits of Parton Distribution Functions (PDFs) using fixed parametrization
+(with an arbitrary functional form).
 Uncertainty estimation is computed as Hessian uncertainties via eigenvector scans (although a replica-based approach can also be taken by repeating the central-value estimation to an ensemble of data replicas).
 
 PDF fits are performed at a fixed scale, using the theory and data made available by the [NNPDF collaboration](https://github.com/nnpdf/nnpdf).
@@ -20,13 +21,13 @@ Cloning this repository and installing with pip should install both this code an
 If a python environment is also required, our recommendation is to use `conda` to create the environment:
 
 ```
-    conda create -n fixpar_environment nnpdf -c conda-forge
-    conda activate fixpar_environment
+    conda create -n fppdf_environment nnpdf -c conda-forge
+    conda activate fppdf_environment
     python -m pip install . --no-deps
 ```
 this code does not add extra dependencies with respect to `nnpdf` (and `nnpdf` is a dependency of this code), therefore this should be enough to get this code and all dependencies in the environment.
 
-After the installation several commands prefixed with `fixpar_` will be installed: `fixpar_setupfit`, `fixpar_fitpdf`, `fixpar_hessianerr` and `fixpar_evolve`.
+After the installation several commands prefixed with `fppdf_` will be installed: `fppdf_setupfit`, `fppdf_fitpdf`, `fppdf_hessianerr` and `fppdf_evolve`.
 
 # Running the code
 
@@ -73,7 +74,7 @@ If this namespace exists, the theory covariance matrix will be computed with the
 Run the following command to prepare the run and compute the theory covariance matrix.
 Running this command will download any grids necessary to compute the theory predictions for each of the theories involved in the computation of the covariance matrix and will prepare the theory covariance matrix to be used during optimization.
 ```
-fixpar_setupfit <runcard.yml>
+fppdf_setupfit <runcard.yml>
 ```
 
 ## 1. Perform the minimization.
@@ -82,21 +83,21 @@ Performs the fit. If the theory covariance matrix is to be used, `setupfit` (see
 This procedure might take some hours depending on the number of datasets specified and how far off the minimum the fit started from.
 At the end of this procedure the best fit to the central data will be produced.
 ```
-fixpar_fitpdf <runcard.yml>
+fppdf_fitpdf <runcard.yml>
 ```
 
 ## 2. Compute the hessian error members.
 
 Once the fit has finished, used the fit parameters found in the previous step to compute the hessian error members using the chosen prescription.
 ```
-fixpar_hessianerr <runcard.yml>
+fppdf_hessianerr <runcard.yml>
 ```
 
 ## 3. Evolve and create the final grid.
 
 After the central PDF and the eigenvectors have been computed, they need to be evolve to generate a full LHAPDF grid for all scales. This is obtained with:
 ```
-fixpar_evolve <runcard.yml>
+fppdf_evolve <runcard.yml>
 ```
 which will generate an LHAPDF grid in the `outputs/evgrids/` folder.
 

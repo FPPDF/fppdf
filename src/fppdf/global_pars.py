@@ -47,6 +47,8 @@ class Chi2Pars:
     add_hessp = False
     # use dynamic tolerance
     dynamic_tol: bool = False
+    # Eigenvectors to exclude from the scan (default 30)
+    lam_sub: int = 30
     # T^2 value for error calculation
     t2_err: float = 1.0
     # pos chi_0
@@ -465,21 +467,25 @@ class DataHolder:
         tspec = self.get_theory()
         return tspec.get_description()["IC"] == 1
 
+
 # Limite the shared global data to what's available in this dictionary
 shared_global_data = {"data": None, "posdata": None}
 
+
 def shared_populate_data(theoryid=40001000, use_theory_covmat=False):
 
-    config = {"theoryid": theoryid, "use_cuts": "internal", "added_filter_rules":fit_pars.added_filter_rules}
+    config = {
+        "theoryid": theoryid,
+        "use_cuts": "internal",
+        "added_filter_rules": fit_pars.added_filter_rules,
+    }
 
     datasets = []
     for dinput in fit_pars.dataset_40:
         ds = API.dataset(dataset_input=dinput, **config)
         datasets.append(ds)
 
-    positivity_datasets = API.posdatasets(
-        posdatasets=fit_pars.pos_data40, **config
-    )
+    positivity_datasets = API.posdatasets(posdatasets=fit_pars.pos_data40, **config)
 
     shared_global_data["data"] = DataHolder(
         tuple(datasets), theoryid=theoryid, use_theory_covmat=use_theory_covmat
