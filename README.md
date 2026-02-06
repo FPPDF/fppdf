@@ -33,7 +33,7 @@ After the installation several commands prefixed with `fppdf_` will be installed
 
 ## Runcard preparation
 
-The optimization procedure, minimization, and creation of LHAPDF grid is goberned by a `.yaml` runcard, of which there are several examples in this repository (e.g., `example_full_short.yml`).
+The optimization procedure, minimization, and creation of LHAPDF grid is governed by a `.yaml` runcard, of which there are several examples in this repository (e.g., `example_full_short.yml`).
 Below we describe some of the options in these runcards:
 
 ### Global options
