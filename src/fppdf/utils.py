@@ -7,6 +7,16 @@ from pathlib import Path
 
 from fppdf import global_pars
 
+# Suppress validphys warnings for cfactors being in both theory and package
+from validphys.loader import log as loader_logger
+import logging
+
+class _SuppressCfactor(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return "The theory cfactor takes precedence." not in record.getMessage()
+
+loader_logger.addFilter(_SuppressCfactor())
+
 
 def existing_path(value):
     value_path = Path(value)

@@ -14,7 +14,8 @@ import tempfile
 
 # Import directly from the script to make sure any possible changes are propagated
 from n3fit.scripts.vp_setupfit import ConfigError, SetupFitApp, SetupFitConfig
-
+# Import fppdf.utils to activate the warning suppression for cfactors
+import fppdf.utils
 
 class FixparSetupConfig(SetupFitConfig):
 
