@@ -6,7 +6,7 @@ build-backend = "poetry.core.masonry.api"
 name = "fppdf"
 version = "0.0.0"
 description = "A framework for the extraction of Parton Distribution Functions using abitrary parametrizations"
-readme = "README"
+readme = "README.md"
 authors = [
     "Juan M. Cruz-Martinez <juacrumar@lairen.eu>",
     "Lucian Harland-Lang <l.harland-lang@ucl.ac.uk>",
