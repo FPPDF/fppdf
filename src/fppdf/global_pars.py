@@ -444,7 +444,6 @@ class DataHolder:
         # Load the data
         lcd = [i.load_commondata().central_values for i in datasets]
         lcd = pd.concat(lcd).values
-        import pdb; pdb.set_trace()
         if genrep:
             covmat = self.produce_covmat(use_t0=False, names=names)
         else:
