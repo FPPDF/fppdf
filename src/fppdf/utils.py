@@ -43,10 +43,10 @@ def init_global_pars(config):
         _input_config["pd_output"] = _pseudodata_config.get("pd_output", False)
 
     _pdf_closure_config = config.get("pdf closure", {})
-    if _pdf_closure_config:
-        _pdf_pars["pdfscat"] = _pdf_closure_config.get("pdfscat", False)
-        _pdf_pars["pdflabel"] = _pdf_closure_config.get("pdflabel")
-        _pdf_pars["pdpdf"] = _pdf_closure_config.get("pdpdf", False)
+    # if _pdf_closure_config:
+    #     _pdf_pars["pdfscat"] = _pdf_closure_config.get("pdfscat", False)
+    #     _pdf_pars["pdflabel"] = _pdf_closure_config.get("pdflabel")
+    #     _pdf_pars["pdpdf"] = _pdf_closure_config.get("pdpdf", False)
 
     _full_dataset = config["dataset_inputs"]
     _fit_pars["dataset_40"] = _full_dataset
@@ -66,6 +66,7 @@ def init_global_pars(config):
     global_pars.pdf_pars = global_pars.PDFPars(**_pdf_pars)
     global_pars.chi2_pars = global_pars.Chi2Pars(**_chi2_pars)
     global_pars.fit_pars = global_pars.FitPars(**_fit_pars)
+    global_pars.pdf_closure = global_pars.PDFClosure(**_pdf_closure_config)
 
     # if global_pars.pdf_pars.lhin != global_pars.fit_pars.fixpar:
     #     raise ValueError("Both pdf_pars::lhin and fit_pars::fixpar must have the same value")

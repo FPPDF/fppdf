@@ -238,7 +238,7 @@ def chi2corr_global(datasets, vp_pdf=None, theta_idx=None):
 
     # Get the covmat for all the dataset we have calculated chi2 for. The order is the same as the vector of theories
     cov = shared_global_data["data"].produce_covmat(
-        pdf=vp_pdf, datasets=datasets, use_t0=chi2_pars.t0
+        pdf=vp_pdf, datasets=datasets, use_t0=chi2_pars.t0, closure=pdf_closure.level0_ct, fakepdf=pdf_closure.fakepdf
     )
     covin = la.inv(cov)
 
@@ -254,12 +254,12 @@ def chi2corr_global(datasets, vp_pdf=None, theta_idx=None):
             print("Computing t0 cov...", end="")
             try:
                 cov = shared_global_data["data"].produce_covmat(
-                    pdf=vp_pdf, datasets=datasets, use_t0=True
+                    pdf=vp_pdf, datasets=datasets, use_t0=True, closure=pdf_closure.level0_ct, fakepdf=pdf_closure.fakepdf
                 )
                 covin = la.inv(cov)
             except (la.LinAlgError, ValueError) as err:
                 print('t0 cov may be ill behaved, trying exp cov instead...')
-                cov = shared_global_data["data"].produce_covmat(datasets=datasets, use_t0=False)
+                cov = shared_global_data["data"].produce_covmat(datasets=datasets, use_t0=False, closure=pdf_closure.level0_ct, fakepdf=pdf_closure.fakepdf)
                 covin = la.inv(cov)
 
             # TODO: these two variables can be removed?
@@ -279,7 +279,7 @@ def chi2corr_global(datasets, vp_pdf=None, theta_idx=None):
             fit_pars.pseud = True
             dattot = dat_calc_rep(datasets, genrep=True)
         else:
-            dattot = dat_calc_rep(datasets, genrep=False)
+            dattot = dat_calc_rep(datasets, genrep=pdf_closure.level1_ct, closure=pdf_closure.level0_ct, fakepdf=pdf_closure.fakepdf)
         chi2_pars.ndat = len(dattot)
         dload_pars.darr_gl = dattot
 
@@ -517,7 +517,7 @@ def chi2totcalc(vp_pdf=None):
         else:
             pdf = None
 
-        covmat = shared_global_data["data"].produce_covmat(datasets=datasets, pdf=pdf, use_t0=chi2_pars.t0)
+        covmat = shared_global_data["data"].produce_covmat(datasets=datasets, pdf=pdf, use_t0=chi2_pars.t0, closure=pdf_closure.level0_ct, fakepdf=pdf_closure.fakepdf)
         labels = [i.name for i in datasets for _ in range(i.load_commondata().ndata)]
         dfcov = pd.DataFrame(covmat, columns=labels, index=labels)
 
@@ -833,8 +833,11 @@ def jaccalc_newmin(hess_calc: bool, vp_pdf: MSHTPDF):
         # Finally compute the penalties for the points with negative contributions:
         if fit_pars.pos_const:
             tmp = pos_calc(positivity_data, vp_pdf, theta_idx=parameter_index)
-            # Take only the indexes which contribute
-            jac_result += np.sum(tmp[positivity_indexes])
+            if tmp == 0.:
+                jac_result += 0.
+            else:
+                # Take only the indexes which contribute
+                jac_result += np.sum(tmp[positivity_indexes])
 
         jacarr[ip] = jac_result
 
@@ -1033,4 +1036,4 @@ def calc_covmat_t0(inpt0):
     dnames = [i["dataset"] for i in inpt0["dataset_inputs"]]
     pdfset = inpt0["t0pdfset"]
     use_t0 = inpt0["use_t0"]
-    return shared_global_data["data"].produce_covmat(pdf=pdfset, names=tuple(dnames), use_t0=use_t0)
+    return shared_global_data["data"].produce_covmat(pdf=pdfset, names=tuple(dnames), use_t0=use_t0, closure=pdf_closure.level0_ct, fakepdf=pdf_closure.fakepdf)
