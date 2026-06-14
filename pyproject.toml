@@ -37,7 +37,7 @@ fppdf_setupfit = "fppdf.scripts.fixpar_setupfit:main"
 
 [tool.poetry.dependencies]
 python = ">=3.9"
-nnpdf = ">=4.1.3"
+nnpdf = "=4.1.4"
 
 [tool.black]
 line-length = 100
