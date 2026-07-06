@@ -442,7 +442,8 @@ class DataHolder:
             datasets = self.select_datasets(names=names)
 
         # Load the data
-        lcd = [i.load_commondata() for i in datasets]
+        lcd = [i.load_commondata().central_values for i in datasets]
+        lcd = pd.concat(lcd).values
         if genrep:
             covmat = self.produce_covmat(use_t0=False, names=names)
         else:
