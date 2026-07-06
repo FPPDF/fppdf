@@ -1,0 +1,7 @@
+chi2(t0) in = 1448.387301470723
+chi2(exp) in= 1356.2881515410438
+chi2(t0) out = 1362.4212284578816
+chi2(exp) out = 1288.3626568695765
+ndat = 1078
+Pos penalty in = 0.0
+Pos penalty out = 0.0

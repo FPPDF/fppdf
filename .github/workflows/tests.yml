@@ -1,0 +1,43 @@
+name: Test FPPDF
+
+on: [push]
+
+env:
+  PYTHONHASHSEED: "0"
+
+jobs:
+  run_a_fit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: conda-incubator/setup-miniconda@v4
+        with:
+          python-version: "3.13"
+          use-mamba: true
+          channels: conda-forge
+          show-channel-urls: true
+          auto-update-conda: true
+          activate-environment: fppdf_environment
+          conda-remove-defaults: true
+      - name: Cleanup cache
+        if: ${{ runner.environment == 'github-hosted' }}
+        shell: bash -l {0}
+        run: |
+          sudo rm -rf /opt/hostedtoolcache/Python/3.9*
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/local/lib/android/sdk
+      - name: Install host requirements
+        shell: bash -l {0}
+        run: |
+          conda install lhapdf pip
+      - name: Install code
+        shell: bash -l {0}
+        run: |
+          pip install .
+      - name: Test a simple fit
+        shell: bash -l {0}
+        run: |
+          cd test
+          fppdf_fitpdf test_runcard.yml
+          fppdf_hessianerr test_runcard.yml
+          fppdf_evolve test_runcard.yml
