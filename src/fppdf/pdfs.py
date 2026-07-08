@@ -143,7 +143,7 @@ class MSHTPDF(PDF):
         self._theta_idx = theta_idx
 
         # Add a hash of the parameter to the name to make them unique and update cached quantities
-        name = f"{name}_{hash(pdf_parameters.tostring())}"
+        name = f"{name}_{hash(pdf_parameters.tobytes())}"
         super().__init__(name, None)
 
         # Create some fake info:

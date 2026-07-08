@@ -1,0 +1,53 @@
+# 
+# Test runcard for FPPDF with a small dataset for quick testing
+#
+
+dataset_inputs:
+- {dataset: NMC_NC_NOTFIXED_EM-F2, variant: legacy_dw}
+- {dataset: HERA_NC_318GEV_EM-SIGMARED, variant: legacy}
+- {dataset: HERA_NC_225GEV_EP-SIGMARED, variant: legacy}
+- {dataset: HERA_NC_318GEV_EP-SIGMARED, variant: legacy}
+- {dataset: HERA_CC_318GEV_EP-SIGMARED, variant: legacy}
+- {dataset: HERA_NC_318GEV_EAVG_BOTTOM-SIGMARED, variant: legacy}
+- {dataset: D0_WPWM_1P96TEV_ASY, variant: legacy}
+- {dataset: ATLAS_WPWM_7TEV_36PB_ETA, variant: legacy}
+- {dataset: ATLAS_Z0_7TEV_36PB_ETA, variant: legacy}
+- {dataset: ATLAS_Z0_7TEV_46FB_CC-Y, variant: legacy}
+- {dataset: CMS_Z0J_8TEV_PT-Y, cfac: [NRM], variant: legacy_10}
+- {dataset: CMS_TTBAR_7TEV_TOT_X-SEC, variant: legacy}
+- {dataset: CMS_TTBAR_8TEV_TOT_X-SEC, variant: legacy}
+- {dataset: CMS_TTBAR_13TEV_TOT_X-SEC, variant: legacy}
+- {dataset: CMS_SINGLETOP_7TEV_TCHANNEL-XSEC, variant: legacy}
+- {dataset: CMS_SINGLETOP_8TEV_TCHANNEL-XSEC, variant: legacy}
+- {dataset: CMS_SINGLETOP_13TEV_TCHANNEL-XSEC, variant: legacy}
+- {dataset: LHCB_Z0_7TEV_DIELECTRON_Y}
+- {dataset: LHCB_Z0_8TEV_DIELECTRON_Y}
+- {dataset: LHCB_WPWM_7TEV_MUON_Y, cfac: [NRM]}
+- {dataset: LHCB_Z0_13TEV_DIELECTRON-Y}
+
+theoryid: 40_000_000
+datacuts:
+  use_cuts: internal
+  q2min: 3.49
+  w2min: 12.5
+
+genrep: False
+#mcseed: 1
+
+# Fixpar specific parameters
+inout_parameters:
+  inputnam: test_input_parameters.dat
+  # output label
+  label: test_nnlo_ic
+
+fit_parameters:
+  # run with fixed input parameters
+  fixpar: False
+  # impose NNPDF positivity in fit
+  nnpdf_pos: False
+  # if true then generates a replica from baseline dataset with seed irep
+  pseud: False
+
+chi2_parameters:
+  dynamic_tol: True
+  lam_sub: 15

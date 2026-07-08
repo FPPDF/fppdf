@@ -1,0 +1,25 @@
+name: Test FPPDF
+
+on: [push]
+
+env:
+  PYTHONHASHSEED: "0"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install pixi
+        uses: prefix-dev/setup-pixi@v0.10.0
+      - name: Install project & dependencies
+        run: pixi install
+      - name: Run fit, Hessian error, and evolution
+        run: |
+          cd test
+          pixi run fppdf_fitpdf test_runcard.yml
+          pixi run fppdf_hessianerr test_runcard.yml
+          pixi run fppdf_evolve test_runcard.yml
+      - name: Compare outputs against reference
+        run: |
+          python test/compare_outputs.py test/reference test/outputs --tol 1e-3
