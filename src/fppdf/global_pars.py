@@ -19,7 +19,9 @@ from validphys.api import API
 from validphys.convolution import central_predictions
 from validphys.covmats import dataset_inputs_covmat_from_systematics
 from validphys.lhaindex import get_lha_datapath
-from validphys.pseudodata import make_replica
+from validphys.pseudodata import make_replica, level0_commondata_wc
+from validphys.loader import Loader
+
 
 
 @dataclasses.dataclass
@@ -188,12 +190,18 @@ class PDFPars:
 
 @dataclasses.dataclass
 class PDFClosure:
+    # if true use level-0 data
+    level0_ct: bool = False
+    # if true add level-1 noise on the top of level-0 data
+    level1_ct: bool = False
+    # pdsf to be used for pseudodata generation
+    fakepdf: str = 'MSHT20nnlo_as118'
     # if true then scatters when doing direct PDF pd fit
-    pdfscat = False
+    pdfscat: bool = False
     # label of pseudodata used
-    pdlabel = 'NNPDF40pch_gl_l0'
+    pdlabel: str = 'NNPDF40pch_gl_l0'
     #  if true then do direct fit to PDF pseudodata
-    pdpdf = False
+    pdpdf: bool = False
 
 
 @dataclasses.dataclass
@@ -302,7 +310,7 @@ class FitPars:
     # if true then generates a replica from baseline dataset with seed irep
     # WIP Equivalent to genrep
     pseud: bool = False
-    # irep number - also used when generating error grids
+    # irep number - also used when generating error grids and level-1 noise for closure tests
     irep: int = 0
     # if true impose weight to prefer delta_d > 0.25
     deld_const: bool = False
@@ -397,7 +405,7 @@ class DataHolder:
         return filecovmat
 
     def produce_covmat(
-        self, pdf=None, imin=None, imax=None, names=None, datasets=None, use_t0=True
+        self, pdf=None, imin=None, imax=None, names=None, datasets=None, use_t0=True, closure=False, fakepdf=None
     ):
         """Produce the t0 covmat for the given PDF for the datasets.
         Either by using imin-imax or by using a tuple of names.
@@ -420,6 +428,13 @@ class DataHolder:
 
         # TODO: if the datasets are not ordered by experiment in the runcard the might come incorrectly here!!
         cds = [ds.load_commondata() for ds in datasets]
+
+        # use level0 data to build the covmat
+        if closure:
+            if fakepdf is None:
+                raise ValueError("PDF missing for level0 data")
+            cds = shared_global_data["data"].level0_data(fakepdf, datasets=datasets)
+
         covmat = dataset_inputs_covmat_from_systematics(
             cds, _list_of_central_values=central_values, use_weights_in_covmat=False
         )
@@ -436,16 +451,24 @@ class DataHolder:
         return covmat + thcovmat
 
     @cache
-    def produce_replica(self, names=None, datasets=None, irep=0, genrep=False):
+    def produce_replica(self, names=None, datasets=None, irep=0, genrep=False, closure=False, fakepdf=None):
         """Produce the replica data given a tuple of datasets"""
         if datasets is None:
             datasets = self.select_datasets(names=names)
 
-        # Load the data
-        lcd = [i.load_commondata().central_values for i in datasets]
+        # Load the data.
+        # If closure test load level0 data
+        if closure:
+            if fakepdf is None:
+                raise ValueError("PDF missing for level0 data")
+            datasets_l0 = shared_global_data["data"].level0_data(fakepdf, datasets=datasets)
+            lcd = [i.central_values for i in datasets_l0]
+        else:
+            lcd = [i.load_commondata().central_values for i in datasets]
+        
         lcd = pd.concat(lcd).values
         if genrep:
-            covmat = self.produce_covmat(use_t0=False, names=names)
+            covmat = self.produce_covmat(use_t0=False, names=names, datasets=datasets, closure=closure, fakepdf=fakepdf)
         else:
             covmat = None
 
@@ -467,6 +490,21 @@ class DataHolder:
         """Check whether the theory has charm active at the fitting scale."""
         tspec = self.get_theory()
         return tspec.get_description()["IC"] == 1
+
+    def level0_data(self, fakepdf, imin=None, imax=None, names=None, datasets=None):
+        """Produce level0 pseudodata"""
+        
+        if datasets is None:
+            if names is None and (imin is not None and imax is not None):
+                datasets = self.datasets[imin:imax]
+            else:
+                datasets = self.select_datasets(names=names)
+        data_group_spec = Loader().check_experiment("DataGroupSpecForCt", list(datasets))
+        fakepdf = API.pdf(pdf=fakepdf)
+
+        return level0_commondata_wc(data_group_spec, fakepdf)
+
+
 
 
 # Limite the shared global data to what's available in this dictionary

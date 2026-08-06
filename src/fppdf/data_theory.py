@@ -6,12 +6,12 @@ from fppdf.global_pars import fit_pars, pdf_pars, shared_global_data
 
 
 @cache
-def dat_calc_rep(datasets, genrep=None):
+def dat_calc_rep(datasets, genrep=None, closure=False, fakepdf=None):
     """Given a list of datanames, produce the replica pseudodata."""
     if genrep is None:
         genrep = fit_pars.pseud
     return shared_global_data["data"].produce_replica(
-        datasets=datasets, irep=fit_pars.irep, genrep=genrep
+        datasets=datasets, irep=fit_pars.irep, genrep=genrep, closure=closure, fakepdf=fakepdf
     )
 
 
